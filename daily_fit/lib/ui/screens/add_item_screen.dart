@@ -11,8 +11,12 @@ import '../../models/enums.dart';
 import '../../data/wardrobe_repository.dart';
 import '../../data/database.dart';
 
+/// Dual-mode screen: `initialItem == null` → add a new item,
+/// otherwise edit the existing item's details.
 class AddItemScreen extends ConsumerStatefulWidget {
-  const AddItemScreen({super.key});
+  final ClothingItem? initialItem;
+
+  const AddItemScreen({super.key, this.initialItem});
 
   @override
   ConsumerState<AddItemScreen> createState() => _AddItemScreenState();
@@ -21,14 +25,42 @@ class AddItemScreen extends ConsumerStatefulWidget {
 class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _colorController = TextEditingController();
   
   ItemCategory? _selectedCategory;
   Fit? _selectedFit;
+  String? _selectedColor;
   double _warmthLevel = 3;
   bool _homeOnly = false;
   File? _imageFile;
   bool _isSaving = false;
+
+  static const List<String> _palette = [
+    'Black', 'White', 'Grey', 'Navy', 'Blue', 'Denim', 'Green', 'Olive',
+    'Beige', 'Brown', 'Burgundy', 'Red', 'Yellow', 'Orange', 'Pink', 'Purple',
+  ];
+
+  bool get _isEditing => widget.initialItem != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _nameController.text = item.name ?? '';
+      _selectedCategory = item.category;
+      _selectedFit = item.fit;
+      _selectedColor = item.color;
+      _warmthLevel = item.warmthLevel.toDouble();
+      _homeOnly = item.homeOnly;
+      if (item.photo.isNotEmpty) _imageFile = File(item.photo);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
@@ -51,28 +83,47 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // Save image to local app directory
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedImage = await _imageFile!.copy(p.join(appDir.path, fileName));
-
       final repo = ref.read(wardrobeRepositoryProvider);
-      await repo.addItem(
-        ClothingItemsCompanion.insert(
+
+      if (_isEditing) {
+        final original = widget.initialItem!;
+        // Keep the existing photo unless a new one was picked.
+        var photoPath = original.photo;
+        if (original.photo != _imageFile!.path) {
+          photoPath = (await _copyImageToStorage(_imageFile!)).path;
+        }
+        await repo.updateItem(original.copyWith(
           category: _selectedCategory!,
           bodyZone: _selectedCategory!.zone,
           name: drift.Value(_nameController.text.isNotEmpty ? _nameController.text : null),
-          color: drift.Value(_colorController.text.isNotEmpty ? _colorController.text : null),
+          color: drift.Value(_selectedColor),
           fit: _selectedFit!,
-          photo: savedImage.path,
-          homeOnly: drift.Value(_homeOnly),
-          warmthLevel: drift.Value(_warmthLevel.toInt()),
-        )
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item added successfully!')));
-        context.go('/wardrobe');
+          photo: photoPath,
+          homeOnly: _homeOnly,
+          warmthLevel: _warmthLevel.toInt(),
+        ));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item updated!')));
+          context.pop();
+        }
+      } else {
+        final savedImage = await _copyImageToStorage(_imageFile!);
+        await repo.addItem(
+          ClothingItemsCompanion.insert(
+            category: _selectedCategory!,
+            bodyZone: _selectedCategory!.zone,
+            name: drift.Value(_nameController.text.isNotEmpty ? _nameController.text : null),
+            color: drift.Value(_selectedColor),
+            fit: _selectedFit!,
+            photo: savedImage.path,
+            homeOnly: drift.Value(_homeOnly),
+            warmthLevel: drift.Value(_warmthLevel.toInt()),
+          )
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item added successfully!')));
+          context.go('/wardrobe');
+        }
       }
     } finally {
       if (mounted) {
@@ -81,12 +132,18 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     }
   }
 
+  Future<File> _copyImageToStorage(File source) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    return source.copy(p.join(appDir.path, fileName));
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUpper = _selectedCategory?.zone == BodyZone.upper;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Item')),
+      appBar: AppBar(title: Text(_isEditing ? 'Edit Item' : 'Add Item')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -123,9 +180,18 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
               ),
               const SizedBox(height: 16),
               
-              TextFormField(
-                controller: _colorController,
-                decoration: const InputDecoration(labelText: 'Color (Optional)', border: OutlineInputBorder()),
+              const Text('Color (Optional)', style: TextStyle(fontWeight: FontWeight.w500)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _palette.map((c) {
+                  return ChoiceChip(
+                    label: Text(c),
+                    selected: _selectedColor == c,
+                    onSelected: (_) => setState(() => _selectedColor = c),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 16),
               
@@ -156,7 +222,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                 onPressed: _isSaving ? null : _saveItem,
                 child: _isSaving 
                   ? const CircularProgressIndicator(color: Colors.black)
-                  : const Text('Save Item'),
+                  : Text(_isEditing ? 'Save Changes' : 'Save Item'),
               )
             ],
           ),

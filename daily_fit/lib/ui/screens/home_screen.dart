@@ -1,12 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
-import 'package:drift/drift.dart' as drift;
 
 import '../../data/recommendation_service.dart';
 import '../../data/user_profile_service.dart';
-import '../../data/database_provider.dart';
 import '../../data/database.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -60,19 +59,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Future<void> _wearOutfit(RecommendedOutfit outfit) async {
-    final db = ref.read(databaseProvider);
-    final List<int> ids = [outfit.upper.id, outfit.lower.id, outfit.footwear.id];
-    if (outfit.accessory != null) ids.add(outfit.accessory!.id);
-    final itemIds = ids.join(',');
-    
-    await db.into(db.outfitLogs).insert(
-      OutfitLogsCompanion.insert(
-        date: DateTime.now(),
-        items: itemIds,
-        wasAiSuggested: const drift.Value(true),
-        vibeTag: drift.Value(_vibeController.text),
-        destination: drift.Value(_isGoingOut ? _locationController.text : 'Home'),
-      )
+    HapticFeedback.mediumImpact();
+    final service = ref.read(recommendationServiceProvider);
+    await service.logWornOutfit(
+      outfit,
+      destination: _isGoingOut ? _locationController.text : 'Home',
+      vibe: _vibeController.text,
     );
 
     if (mounted) {
@@ -99,11 +91,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         elevation: 0,
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF0F0F0F), Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? const [Color(0xFF0F0F0F), Color(0xFF1A1A1A), Color(0xFF0F0F0F)]
+                : const [Color(0xFFF6F6F4), Color(0xFFECECE8), Color(0xFFF6F6F4)],
           )
         ),
         child: SafeArea(
@@ -138,7 +132,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               children: [
                 SwitchListTile(
                   title: const Text('Heading Out?', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Factors in weather and excludes home-only items.', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                  subtitle: Text('Factors in weather and excludes home-only items.',
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                   value: _isGoingOut,
                   onChanged: (val) => setState(() => _isGoingOut = val),
                   activeColor: Theme.of(context).colorScheme.primary,
@@ -155,7 +150,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                         labelText: 'Location',
                         prefixIcon: const Icon(Icons.location_pin),
                         filled: true,
-                        fillColor: Colors.black26,
+                        fillColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                     ),
@@ -171,7 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     hintText: 'e.g. Office casual, date night, gym',
                     prefixIcon: const Icon(Icons.style),
                     filled: true,
-                    fillColor: Colors.black26,
+                    fillColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
                 ),
@@ -187,7 +182,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
               padding: const EdgeInsets.symmetric(vertical: 20),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 8,
-              shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              shadowColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             child: _isGenerating
               ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3))
@@ -255,14 +250,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildOutfitCard(RecommendedOutfit outfit) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        color: Colors.white.withOpacity(0.05),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+        color: scheme.surface.withValues(alpha: 0.5),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6), width: 1.5),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, spreadRadius: -5)
+          BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20, spreadRadius: -5)
         ]
       ),
       child: ClipRRect(
@@ -278,7 +274,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   children: [
                     Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary, size: 20),
                     const SizedBox(width: 8),
-                    const Text('Stylist Note', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 12)),
+                    Text('Stylist Note',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            fontSize: 12)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -369,11 +370,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   }
 
   Widget _buildGlassCard({required Widget child}) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: scheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),

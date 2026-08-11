@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../data/wardrobe_repository.dart';
+import '../widgets/empty_state.dart';
 
 class LaundryScreen extends ConsumerWidget {
   const LaundryScreen({super.key});
@@ -18,7 +20,12 @@ class LaundryScreen extends ConsumerWidget {
           final laundryItems = items.where((i) => i.inLaundry).toList();
 
           if (laundryItems.isEmpty) {
-            return const Center(child: Text('Nothing in the laundry right now.'));
+            return const EmptyState(
+              icon: Icons.local_laundry_service,
+              title: 'Nothing in the laundry',
+              subtitle: 'Send items to the laundry from your wardrobe — '
+                  'long-press any item to mark it dirty.',
+            );
           }
 
           return ListView.builder(

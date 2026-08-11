@@ -1,10 +1,13 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/wardrobe_repository.dart';
 import '../../models/enums.dart';
 import '../../data/database.dart';
+import '../widgets/empty_state.dart';
 
 class WardrobeScreen extends ConsumerStatefulWidget {
   const WardrobeScreen({super.key});
@@ -43,7 +46,22 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
               : items.where((i) => i.bodyZone == _filterZone).toList();
               
           if (filtered.isEmpty) {
-            return const Center(child: Text('No items found.'));
+            return EmptyState(
+              icon: Icons.checkroom,
+              title: _filterZone == null
+                  ? 'No items in your wardrobe yet'
+                  : 'Nothing in this category',
+              subtitle: _filterZone == null
+                  ? 'Add your first piece to start getting outfit suggestions.'
+                  : 'Long-press any item for more options.',
+              action: _filterZone == null
+                  ? ElevatedButton.icon(
+                      onPressed: () => context.go('/add'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add an Item'),
+                    )
+                  : null,
+            );
           }
 
           return GridView.builder(
@@ -146,6 +164,14 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
       builder: (ctx) => SafeArea(
         child: Wrap(
           children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit Item'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/edit', extra: item);
+              },
+            ),
             ListTile(
               leading: Icon(item.inLaundry ? Icons.checkroom : Icons.local_laundry_service),
               title: Text(item.inLaundry ? 'Mark as Clean' : 'Send to Laundry'),

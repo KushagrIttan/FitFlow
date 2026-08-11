@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for weather (open-meteo) and Gemini API calls in release builds.
+         Debug/profile manifests get this automatically from Flutter; release does not. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ runtime notification permission for the daily reminder. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="daily_fit"
+        android:label="Daily Fit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

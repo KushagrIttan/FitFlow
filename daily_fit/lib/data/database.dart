@@ -38,7 +38,9 @@ class OutfitLogs extends Table {
 
 @DriftDatabase(tables: [ClothingItems, OutfitLogs])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  /// Pass an executor (e.g. `NativeDatabase.memory()`) in tests;
+  /// production uses the on-device SQLite file.
+  AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
   int get schemaVersion => 1;

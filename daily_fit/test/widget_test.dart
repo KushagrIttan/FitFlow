@@ -1,30 +1,94 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/native.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:daily_fit/main.dart';
+import 'package:daily_fit/data/database.dart';
+import 'package:daily_fit/data/database_provider.dart';
+import 'package:daily_fit/data/seed_data.dart';
+import 'package:daily_fit/data/user_profile_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUpAll(() {
+    // Never attempt to fetch Google Fonts over the network in tests.
+    GoogleFonts.config.allowRuntimeFetching = false;
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('first launch shows onboarding; completing it lands on Add Item',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final db = AppDatabase(NativeDatabase.memory());
+    await seedDatabase(db);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        databaseProvider.overrideWith((ref) => db),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(db.close);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const DailyFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Onboarding screen, page 1.
+    expect(find.text('Welcome to Daily Fit'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).at(0), '180cm');
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    // Page 2: style notes.
+    await tester.enterText(find.byType(TextField).at(0), 'Minimalist');
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    // Page 3: location.
+    await tester.enterText(find.byType(TextField).at(0), 'New York');
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    // Page 4: finish.
+    await tester.tap(find.text('Start Adding Items'));
+    await tester.pumpAndSettle();
+
+    // Redirect lands on the Add Item screen.
+    expect(find.text('Add Item'), findsOneWidget);
+  });
+
+  testWidgets('onboarding is skipped once completed', (tester) async {
+    SharedPreferences.setMockInitialValues({'onboarding_complete': true});
+    final prefs = await SharedPreferences.getInstance();
+    final db = AppDatabase(NativeDatabase.memory());
+    await seedDatabase(db);
+
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        databaseProvider.overrideWith((ref) => db),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(db.close);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const DailyFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome to Daily Fit'), findsNothing);
+    expect(find.text("What's the vibe today?"), findsOneWidget);
   });
 }

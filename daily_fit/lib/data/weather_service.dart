@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,20 +7,61 @@ final weatherServiceProvider = Provider<WeatherService>((ref) {
   return WeatherService();
 });
 
+/// High-level condition derived from the WMO weather_code.
+enum WeatherCondition {
+  clear,
+  cloudy,
+  rain,
+  snow,
+  storm;
+
+  String get label => switch (this) {
+        WeatherCondition.clear => 'clear skies',
+        WeatherCondition.cloudy => 'overcast',
+        WeatherCondition.rain => 'rain',
+        WeatherCondition.snow => 'snow',
+        WeatherCondition.storm => 'thunderstorms',
+      };
+}
+
 class WeatherData {
   final double temperature;
   final int weatherCode;
-  
+
   WeatherData({required this.temperature, required this.weatherCode});
-  
-  // A simple mapping of temperature to the app's 1-5 warmth level scale
-  // 1 = Cool (needs high warmth), 5 = Hot (needs low warmth)
+
+  // A simple mapping of temperature to the app's 1-5 warmth level scale.
+  // 1 = Lightest (hot weather), 5 = Very warm (freezing weather).
+  // Matches the "Warmth Level (1: Cool, 5: Very Warm)" slider in Add Item.
   int get requiredWarmthLevel {
     if (temperature < 5) return 5; // Freezing, very warm clothing needed
     if (temperature < 15) return 4; // Chilly
     if (temperature < 22) return 3; // Mild
     if (temperature < 28) return 2; // Warm
     return 1; // Hot, minimal warmth needed
+  }
+
+  /// Maps the WMO weather code to a coarse condition the recommendation
+  /// engine can act on (rain → prefer jackets, snow → warmer uppers).
+  WeatherCondition get condition {
+    // https://open-meteo.com/en/docs (WMO codes)
+    if (weatherCode == 0 || weatherCode == 1) return WeatherCondition.clear;
+    if (weatherCode == 2 || weatherCode == 3 || weatherCode == 45 || weatherCode == 48) {
+      return WeatherCondition.cloudy;
+    }
+    // Drizzle / rain / freezing rain / showers.
+    if ((weatherCode >= 51 && weatherCode <= 67) ||
+        (weatherCode >= 80 && weatherCode <= 82)) {
+      return WeatherCondition.rain;
+    }
+    // Snow / snow showers.
+    if ((weatherCode >= 71 && weatherCode <= 77) ||
+        (weatherCode >= 85 && weatherCode <= 86)) {
+      return WeatherCondition.snow;
+    }
+    // Thunderstorms.
+    if (weatherCode >= 95 && weatherCode <= 99) return WeatherCondition.storm;
+    return WeatherCondition.cloudy;
   }
 }
 
@@ -54,7 +96,7 @@ class WeatherService {
         weatherCode: current['weather_code'] as int,
       );
     } catch (e) {
-      print('Weather fetch error: $e');
+      debugPrint('Weather fetch error: $e');
       return null;
     }
   }

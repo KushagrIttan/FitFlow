@@ -7,11 +7,13 @@ A local-first, privacy-focused Flutter application for tracking your wardrobe an
 1. **Open the Project:**
    Open the `daily_fit` folder in Android Studio. Ensure you have the Flutter and Dart plugins installed.
 
-2. **Add Your Gemini API Key:**
-   In the root of the `daily_fit` directory, you will find a `.env` file. Replace `your_api_key_here` with your actual Google Gemini API key.
-   ```
-   GEMINI_API_KEY=your_real_api_key
-   ```
+2. **Add Your Gemini API Key (in the app):**
+   Open **Settings → AI Stylist** inside the app, paste your Google Gemini API
+   key (from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)),
+   tap **Verify** to confirm it works, then **Save Key**. It is stored encrypted
+   on-device (Android Keystore) and never ships in the app binary.
+   Without a key the app still works — recommendations fall back to local
+   scoring (no AI styling).
 
 3. **Running the App via USB Debugging:**
    - Enable Developer Options and USB Debugging on your Pixel 7.
