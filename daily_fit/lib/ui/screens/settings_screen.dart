@@ -8,6 +8,8 @@ import '../../data/database_provider.dart';
 import '../../data/backup_service.dart';
 import '../../data/notification_service.dart';
 import '../../data/theme_mode_provider.dart';
+import '../../data/api_key_service.dart';
+import '../../data/recommendation_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -26,6 +28,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _reminderEnabled = false;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 8, minute: 0);
   bool _isExporting = false;
+
+  final _apiKeyController = TextEditingController();
+  bool _obscureKey = true;
+  bool _isVerifying = false;
+  bool? _verifyResult; // null = not tried, true = key works, false = failed
 
   @override
   void initState() {
@@ -47,6 +54,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _weightController.dispose();
     _styleNotesController.dispose();
     _locationController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
 
@@ -89,6 +97,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (_reminderEnabled) {
         await NotificationService.instance.scheduleDailyReminder(picked);
       }
+    }
+  }
+
+  Future<void> _saveApiKey() async {
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Paste your Gemini API key first')),
+      );
+      return;
+    }
+    await ref.read(geminiApiKeyProvider.notifier).setKey(key);
+    _apiKeyController.clear();
+    if (mounted) {
+      setState(() => _verifyResult = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('API key saved securely on this device')),
+      );
+    }
+  }
+
+  Future<void> _verifyApiKey() async {
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Paste your Gemini API key first')),
+      );
+      return;
+    }
+    setState(() {
+      _isVerifying = true;
+      _verifyResult = null;
+    });
+    final service = ref.read(recommendationServiceProvider);
+    final ok = await service.verifyApiKey(key);
+    if (mounted) {
+      setState(() {
+        _isVerifying = false;
+        _verifyResult = ok;
+      });
+    }
+  }
+
+  Future<void> _clearApiKey() async {
+    await ref.read(geminiApiKeyProvider.notifier).clear();
+    _apiKeyController.clear();
+    if (mounted) {
+      setState(() => _verifyResult = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('API key removed — AI styling is off')),
+      );
     }
   }
 
@@ -145,6 +204,163 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: _isSaving
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Text('Save Profile'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('AI Stylist', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status row.
+                  Row(
+                    children: [
+                      Icon(
+                        ref.watch(geminiApiKeyProvider) != null
+                            ? Icons.auto_awesome
+                            : Icons.auto_awesome_outlined,
+                        size: 20,
+                        color: ref.watch(geminiApiKeyProvider) != null
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        ref.watch(geminiApiKeyProvider) != null
+                            ? 'AI styling: ON'
+                            : 'AI styling: OFF (local mode)',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    ref.watch(geminiApiKeyProvider) != null
+                        ? 'A Gemini key is saved on this device.'
+                        : 'Add a Gemini API key to get AI outfit styling. '
+                            'Without it, recommendations stay local.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: _obscureKey,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: InputDecoration(
+                      labelText: 'Gemini API key',
+                      hintText: 'Paste your key (AIza…)',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureKey
+                            ? Icons.visibility
+                            : Icons.visibility_off),
+                        onPressed: () =>
+                            setState(() => _obscureKey = !_obscureKey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _saveApiKey,
+                          child: const Text('Save Key'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isVerifying ? null : _verifyApiKey,
+                          icon: _isVerifying
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : const Icon(Icons.check_circle_outline,
+                                  size: 18),
+                          label: Text(_isVerifying ? 'Testing…' : 'Verify'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_verifyResult != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          _verifyResult!
+                              ? Icons.check_circle
+                              : Icons.error_outline,
+                          size: 18,
+                          color: _verifyResult!
+                              ? Colors.green
+                              : theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _verifyResult!
+                                ? 'Key works — Gemini responded successfully.'
+                                : 'Verification failed. Check the key is complete '
+                                    'and valid at aistudio.google.com/apikey.',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (ref.watch(geminiApiKeyProvider) != null) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _clearApiKey,
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text('Remove key'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  // Security notice — required with credential forms.
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.lock_outline,
+                            size: 16,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your key is encrypted on this device (Android '
+                            'Keystore) and sent only to Google\'s Gemini API. '
+                            'It never appears in backups or in the app bundle.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

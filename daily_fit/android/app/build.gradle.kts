@@ -7,7 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.daily_fit"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage 10.x requires compileSdk 36.
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -26,7 +27,8 @@ android {
         applicationId = "com.example.daily_fit"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // minSdk 23 required by flutter_secure_storage (Android 6.0+; covers ~98% of devices).
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

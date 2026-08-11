@@ -3,34 +3,36 @@
 ## Gemini API key
 
 Daily Fit calls the Gemini API **directly from the device** (there is no backend).
-This design has one unavoidable consequence: **the API key ships inside the app
-binary**. `pubspec.yaml` bundles `.env` as a Flutter asset, so the key is
-extractable from any APK (`unzip app-release.apk assets/flutter_assets/.env`).
 
-This is a known trade-off of client-side AI apps — a proxy server only moves the
-problem (the key then lives on the server instead). For a personal, local-first
-app, the pragmatic mitigation is **key restriction by fingerprint**:
+**Where the key lives:** the key is configured **in the app** (Settings → AI
+Stylist) and stored encrypted on-device with `flutter_secure_storage`
+(Android Keystore / iOS Keychain). It is:
 
-1. Open [Google AI Studio → API keys](https://aistudio.google.com/apikey).
-2. Select the key used by this app (the one in `daily_fit/.env`).
-3. Choose **Restrict key** → **Android apps**.
-4. Add:
-   - Package name: `com.example.daily_fit`
-   - SHA-1 certificate fingerprint of the **release signing key**
-     (`keytool -list -v -keystore <your-release.jks> -alias <alias>`), and, if
-     you debug on a device, the debug key's SHA-1
-     (`keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android`).
-5. Save. If the key is ever leaked anyway, revoke it from the same page.
+- never committed to git,
+- never bundled in the APK (no `.env` asset — the app bundle is key-free),
+- only sent to Google's Gemini API endpoint when generating recommendations.
 
-Even restricted, treat the key as public knowledge — never use a key that has
-access to anything you couldn't share.
+**Key restriction (recommended):** even though the key no longer ships in the
+binary, restricting it adds a hard second layer. In
+[Google AI Studio → API keys](https://aistudio.google.com/apikey), choose
+**Restrict key → Android apps** and add:
 
-## .env policy
+- Package name: `com.example.daily_fit`
+- SHA-1 fingerprints of your signing keys:
+  - Release: `keytool -list -v -keystore <your-release.jks> -alias <alias>`
+  - Debug (if you run on a device): `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android`
 
-- `.env` is **gitignored** and must never be committed. It holds `GEMINI_API_KEY`.
-- The app works without it (local-only mode: no AI styling, offline fallback).
+If a key is ever leaked anyway, revoke it from the same page.
+
+## Local data
+
+- Wardrobe, photos, outfit history, and the API key never leave the device.
+- Photo files are deleted from disk when an item is removed.
+- The only network calls are: open-meteo (weather) and Gemini (AI styling).
 
 ## Verification
 
-- `gitleaks` (or `git grep`) should find no `GEMINI_API_KEY=` blobs in history.
+- `gitleaks` / `git grep` should find no `GEMINI_API_KEY=` blobs in history.
+- The release APK must contain no `.env` asset:
+  `unzip -l app-release.apk | grep -c env` → 0
 - Repo is local-only; if it ever gets a remote, re-check history before pushing.

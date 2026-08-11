@@ -17,5 +17,9 @@
    - **Reasoning:** Sending the entire wardrobe database as a prompt to Gemini every time would quickly exhaust free API limits and token windows as the wardrobe grows. Pre-scoring locally ensures API usage stays minimal and ensures the rules (no repeating yesterday's shirt, ignore laundry) are strictly enforced mathematically before AI styling takes over.
 
 5. **API Key Management**
-   - **Decision:** Used `flutter_dotenv`.
-   - **Reasoning:** Securely loads the API key from a `.env` file that is gitignored by default, meeting the prompt's requirement not to hardcode it.
+   - **Decision:** Replaced `flutter_dotenv` + `.env` asset with in-app configuration.
+   - **Reasoning:** Bundling `.env` as a Flutter asset shipped the key inside the
+     APK — extractable by anyone. The key is now entered in **Settings → AI
+     Stylist** and stored encrypted via `flutter_secure_storage` (Android
+     Keystore). The binary is key-free and the key never touches git.
+     A "Verify" button confirms the key works before saving.

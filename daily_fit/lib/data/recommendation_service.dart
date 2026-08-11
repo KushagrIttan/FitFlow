@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:drift/drift.dart' as drift;
 
+import 'api_key_service.dart';
 import 'database.dart';
 import 'database_provider.dart';
 import 'user_profile_service.dart';
@@ -17,7 +17,8 @@ final recommendationServiceProvider = Provider<RecommendationService>((ref) {
   final db = ref.watch(databaseProvider);
   final weather = ref.watch(weatherServiceProvider);
   final profile = ref.watch(userProfileServiceProvider);
-  return RecommendationService(db, weather, profile);
+  final apiKey = ref.watch(geminiApiKeyProvider);
+  return RecommendationService(db, weather, profile, apiKey);
 });
 
 class OutfitCandidate {
@@ -60,8 +61,24 @@ class RecommendationService {
   final AppDatabase _db;
   final WeatherService _weather;
   final UserProfileService? _profile;
+  final String? _apiKey;
 
-  RecommendationService(this._db, this._weather, [this._profile]);
+  RecommendationService(this._db, this._weather, [this._profile, String? apiKey])
+      : _apiKey = apiKey;
+
+  /// Confirms a key actually works against the Gemini API. Returns true when
+  /// the model responds. Never throws.
+  Future<bool> verifyApiKey(String apiKey) async {
+    try {
+      final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
+      final response =
+          await model.generateContent([Content.text('Reply with exactly: OK')]);
+      return response.text != null && response.text!.trim().isNotEmpty;
+    } catch (e) {
+      debugPrint('API key verification failed: $e');
+      return false;
+    }
+  }
 
   /// Stage 1: fetch, filter, and score every valid permutation.
   /// Shared by the daily recommendation and the outfit plan generator.
@@ -188,7 +205,7 @@ class RecommendationService {
     }
 
     // 4. Send to Gemini
-    final apiKey = dotenv.isInitialized ? dotenv.env['GEMINI_API_KEY'] : null;
+    final apiKey = _apiKey;
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_api_key_here' || apiKey == 'your_real_api_key') {
       return fallbackRecs();
     }

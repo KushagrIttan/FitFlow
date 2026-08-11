@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ui/theme/app_theme.dart';
 import 'ui/screens/home_screen.dart';
@@ -17,20 +16,13 @@ import 'data/notification_service.dart';
 import 'data/database.dart';
 import 'data/wardrobe_repository.dart';
 import 'data/theme_mode_provider.dart';
+import 'data/api_key_service.dart';
 
 import 'data/database_provider.dart';
 import 'data/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // .env is optional — without it the app runs in local-only mode
-  // (no AI styling), rather than crashing at startup.
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (_) {
-    // No .env file present; GEMINI_API_KEY will simply be absent.
-  }
   
   final prefs = await SharedPreferences.getInstance();
   
@@ -42,6 +34,9 @@ void main() async {
   );
   final db = container.read(databaseProvider);
   await seedDatabase(db);
+  // Load the Gemini API key stored in secure storage (if any) so
+  // recommendations can use it from the very first frame.
+  await container.read(geminiApiKeyProvider.notifier).loadFromStorage();
   // Local notification reminders (safe no-op if the platform rejects it).
   try {
     await NotificationService.instance.init();

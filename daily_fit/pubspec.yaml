@@ -45,11 +45,11 @@ dependencies:
   image_picker: ^1.2.1
   http: ^1.6.0
   google_generative_ai: ^0.4.7
-  flutter_dotenv: ^6.0.1
   flutter_local_notifications: ^19.5.0
   timezone: ^0.10.1
   flutter_timezone: 4.1.0
   share_plus: ^12.0.2
+  flutter_secure_storage: ^10.3.1
 
 dev_dependencies:
   flutter_test:
@@ -87,9 +87,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # NOTE: no .env asset. The Gemini API key is entered in-app and stored
+  # encrypted (flutter_secure_storage) — never bundled with the binary.
+
   # To add assets to your application, add an assets section, like this:
-  assets:
-    - .env
+  # assets:
+  #   - images/a_dot_burr.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
