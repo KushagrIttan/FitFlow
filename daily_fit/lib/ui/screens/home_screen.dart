@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:ui';
 
 import '../../data/recommendation_service.dart';
+import '../../data/location_service.dart';
 import '../../data/user_profile_service.dart';
 import '../../data/api_key_service.dart';
 import '../../data/database.dart';
@@ -22,8 +24,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   final _vibeController = TextEditingController();
   
   bool _isGenerating = false;
+  bool _detectingLocation = false;
   List<RecommendedOutfit> _recommendations = [];
   String? _aiError;
+  String? _emptyNote;
   final PageController _pageController = PageController(viewportFraction: 0.9);
 
   @override
@@ -41,13 +45,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     super.dispose();
   }
 
+  /// Auto-fills the location field from the device's GPS position.
+  /// Runs automatically when "Heading Out" is switched on and from the
+  /// re-detect pin button. Fails soft with a helpful snackbar.
+  Future<void> _detectLocation() async {
+    if (_detectingLocation) return;
+    final service = ref.read(locationServiceProvider);
+    setState(() => _detectingLocation = true);
+    try {
+      final place = await service.detectCurrentPlace()
+          .timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      setState(() {
+        _detectingLocation = false;
+        _locationController.text = place.name;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Using your location: ${place.name}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    } on LocationUnavailableException catch (e) {
+      if (!mounted) return;
+      setState(() => _detectingLocation = false);
+      _showSnack(e.message);
+    } catch (e) {
+      debugPrint('Location detection failed: $e');
+      if (!mounted) return;
+      setState(() => _detectingLocation = false);
+      _showSnack('Could not detect your location — type it manually below.');
+    }
+  }
+
+  void _toggleGoingOut(bool val) {
+    setState(() => _isGoingOut = val);
+    if (val) _detectLocation();
+  }
+
   Future<void> _generate() async {
     if (_isGoingOut && _locationController.text.trim().isEmpty) {
       Fx.tone(FxTone.tap);
       Fx.light();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a location to get weather-aware picks')),
-      );
+      _showSnack('Enter a location (or tap the pin to detect it) to get '
+          'weather-aware picks');
       return;
     }
 
@@ -57,6 +100,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       _isGenerating = true;
       _recommendations = [];
       _aiError = null;
+      _emptyNote = null;
     });
 
     final service = ref.read(recommendationServiceProvider);
@@ -72,27 +116,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         _isGenerating = false;
         _recommendations = recs;
         // Surface when Gemini failed so users know why local picks appeared.
-        _aiError = recs.isNotEmpty && !recs.first.isAiSuggested && ref.read(geminiApiKeyProvider) != null
-            ? service.lastAiError
-            : null;
+        _aiError = recs.isNotEmpty
+            ? (!recs.first.isAiSuggested && ref.read(geminiApiKeyProvider) != null
+                ? service.lastAiError
+                : null)
+            : service.lastAiError;
+        // No outfit could be formed — keep the form hidden and explain why
+        // inline instead of dropping back to a silent/transient snackbar.
+        if (recs.isEmpty) {
+          _emptyNote = service.lastSelectionNote ??
+              'Not enough items to build an outfit — add a top, bottom, and shoes.';
+        }
       });
-
-      // No outfit could be formed — tell the user why instead of silently
-      // re-showing the form.
-      if (recs.isEmpty) {
-        final note = service.lastSelectionNote ??
-            'Not enough items to build an outfit — add a top, bottom, and shoes.';
-        _showEmptyState(note);
-      }
     } catch (e, stack) {
       debugPrint('Recommendation failed: $e\n$stack');
       if (!mounted) return;
-      setState(() => _isGenerating = false);
-      _showEmptyState('Something went wrong while styling you: $e\nPlease try again.');
+      setState(() {
+        _isGenerating = false;
+        _emptyNote = 'Something went wrong while styling you: $e\nPlease try again.';
+      });
     }
   }
 
-  void _showEmptyState(String message) {
+  void _showSnack(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -138,26 +184,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: Theme.of(context).brightness == Brightness.dark
-                ? const [Color(0xFF0F0F0F), Color(0xFF1A1A1A), Color(0xFF0F0F0F)]
-                : const [Color(0xFFF6F6F4), Color(0xFFECECE8), Color(0xFFF6F6F4)],
-          )
-        ),
-        child: SafeArea(
-          child: Column(
+      body: SafeArea(
+        child: Column(
             children: [
-              if (_recommendations.isEmpty) 
-                Expanded(child: _buildInputForm())
+              if (_recommendations.isEmpty)
+                Expanded(
+                    child: _emptyNote == null
+                        ? _buildInputForm()
+                        : _buildEmptyReason())
               else 
                 Expanded(child: _buildRecommendationsCarousel()),
             ],
           ),
-        ),
+      ),
+    );
+  }
+
+  /// Inline "couldn't build an outfit" panel surfaced right in the page —
+  /// shows the engine's shortage reason and any AI error, with a way back
+  /// to the form or straight to the wardrobe.
+  Widget _buildEmptyReason() {
+    final scheme = Theme.of(context).colorScheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Icon(Icons.checkroom,
+              size: 56, color: scheme.primary.withValues(alpha: 0.7)),
+          const SizedBox(height: 16),
+          const Text('No outfits found',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Text(
+            _emptyNote ?? '',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: scheme.onSurface.withValues(alpha: 0.75)),
+          ),
+          if (_aiError != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: scheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.error_outline,
+                      size: 18, color: scheme.onErrorContainer),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'AI styling hit an error: $_aiError',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onErrorContainer),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: () => setState(() {
+              _emptyNote = null;
+              _aiError = null;
+            }),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Text('Adjust & try again'),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => context.go('/add'),
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Add more items to your wardrobe'),
+          ),
+        ],
       ),
     );
   }
@@ -183,7 +295,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                   subtitle: Text('Factors in weather and excludes home-only items.',
                       style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                   value: _isGoingOut,
-                  onChanged: (val) => setState(() => _isGoingOut = val),
+                  onChanged: _toggleGoingOut,
                   activeColor: Theme.of(context).colorScheme.primary,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -197,6 +309,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       decoration: InputDecoration(
                         labelText: 'Location',
                         prefixIcon: const Icon(Icons.location_pin),
+                        suffixIcon: _detectingLocation
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : IconButton(
+                                onPressed: _detectLocation,
+                                icon: const Icon(Icons.my_location),
+                                tooltip: 'Detect my location',
+                              ),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.6),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),

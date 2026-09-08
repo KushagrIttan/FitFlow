@@ -100,4 +100,47 @@ void main() {
     expect(find.text('Welcome to Daily Fit'), findsNothing);
     expect(find.text("What's the vibe today?"), findsOneWidget);
   });
+
+  testWidgets('heading out reveals the location field with an auto-detect pin',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({'onboarding_complete': true});
+    final prefs = await SharedPreferences.getInstance();
+    final db = AppDatabase(NativeDatabase.memory());
+    await seedDatabase(db);
+
+    final container = ProviderContainer(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        databaseProvider.overrideWith((ref) => db),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(db.close);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const DailyFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Onboarding is already complete → app boots straight to Home.
+    expect(find.text('Heading Out?'), findsOneWidget);
+
+    // Location input is hidden until the user heads out.
+    expect(find.byIcon(Icons.location_pin), findsNothing);
+
+    // Flipping the switch reveals it. Auto-detect fires, but the geolocator
+    // channel never answers in tests, so we advance past the 10s detection
+    // timeout to force the graceful fallback path — proving the field and the
+    // re-detect pin always appear and detection can't get stuck forever.
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400)); // AnimatedSize
+    await tester.pump(const Duration(seconds: 11)); // detection timeout
+    await tester.pump(); // rebuild after timeout reset
+    expect(find.byIcon(Icons.location_pin), findsOneWidget);
+    expect(find.byIcon(Icons.my_location), findsOneWidget);
+  });
 }

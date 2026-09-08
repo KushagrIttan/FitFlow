@@ -19,11 +19,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   int _outfitCount = 3;
   bool _isGenerating = false;
   List<RecommendedOutfit> _plan = [];
+  String? _emptyNote;
 
   Future<void> _generate() async {
     setState(() {
       _isGenerating = true;
       _plan = [];
+      _emptyNote = null;
     });
 
     final service = ref.read(recommendationServiceProvider);
@@ -39,14 +41,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       setState(() {
         _isGenerating = false;
         _plan = plan;
+        if (plan.isEmpty) {
+          _emptyNote = service.lastSelectionNote ??
+              'Not enough clean clothes for that many outfits. '
+              'Add more items or run the laundry.';
+        }
       });
-      if (plan.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Not enough clean clothes for that many outfits. '
-                  'Add more items or run the laundry.')),
-        );
-      }
     }
   }
 
@@ -122,9 +122,28 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           const Divider(),
           Expanded(
             child: _plan.isEmpty
-                ? const Center(
-                    child: Text('Your plan will appear here.',
-                        style: TextStyle(color: Colors.white54)))
+                ? Center(
+                    child: _emptyNote == null
+                        ? const Text('Your plan will appear here.',
+                            style: TextStyle(color: Colors.white54))
+                        : Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.event_busy,
+                                    color: Colors.white54, size: 40),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _emptyNote!,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: Colors.white70, height: 1.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _plan.length,

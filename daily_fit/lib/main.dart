@@ -244,11 +244,14 @@ class _AppShellState extends ConsumerState<AppShell> {
         }
       },
       child: Scaffold(
+        // The live gradient is the single background for every tab page and
+        // runs continuously behind the floating glass bar — no seams.
+        extendBody: true,
         body: _ShellBackground(
           child: Padding(
-            // Content slides right up to (and can drift behind) the floating
-            // glass bar — no dead strip between bar and page.
-            padding: const EdgeInsets.only(bottom: 12),
+            // Hold tab content 88px clear of the bottom so it is never hidden
+            // behind the floating pill (64px bar + 14px margin).
+            padding: const EdgeInsets.only(bottom: 88),
             child: widget.child,
           ),
         ),

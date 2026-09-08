@@ -15,7 +15,12 @@ class LaundryScreen extends ConsumerWidget {
     final itemsAsync = ref.watch(wardrobeItemsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Laundry')),
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Laundry'),
+      ),
       body: itemsAsync.when(
         data: (items) {
           final laundryItems = items.where((i) => i.inLaundry).toList();

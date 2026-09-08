@@ -191,7 +191,12 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     final isUpper = _selectedCategory?.zone == BodyZone.upper;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit Item' : 'Add Item')),
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(_isEditing ? 'Edit Item' : 'Add Item'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(

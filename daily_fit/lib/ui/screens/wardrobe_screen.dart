@@ -82,7 +82,10 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
     final itemsAsync = ref.watch(wardrobeItemsProvider);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('My Wardrobe'),
         actions: [
           PopupMenuButton<BodyZone?>(
