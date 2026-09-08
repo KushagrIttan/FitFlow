@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Fit — Project Analysis</title>
+<style>
+  :root { --bg: #0a0a0b; --surface: #141416; --surface2: #1c1c1f; --border: #2a2a2e; --text: #e4e4e7; --muted: #8b8b8f; --green: #34d399; --red: #f87171; --amber: #fbbf24; --blue: #60a5fa; --purple: #a78bfa; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 2rem; max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.3rem; margin: 2.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.5rem 0 0.5rem; color: var(--purple); }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .vitals { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 2rem; }
+  .vital { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .vital-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .vital-value { font-size: 1.1rem; font-weight: 600; margin-top: 0.25rem; }
+  .vital-value.good { color: var(--green); }
+  .vital-value.warn { color: var(--amber); }
+  .vital-value.bad { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .badge-critical { background: rgba(248,113,113,0.15); color: var(--red); }
+  .badge-high { background: rgba(251,191,36,0.15); color: var(--amber); }
+  .badge-medium { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .badge-low { background: rgba(139,139,143,0.15); color: var(--muted); }
+  .badge-positive { background: rgba(52,211,153,0.15); color: var(--green); }
+  code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+  .section-callout { background: var(--surface); border-left: 3px solid var(--purple); padding: 1rem 1.25rem; border-radius: 0 8px 8px 0; margin: 1rem 0; font-size: 0.9rem; }
+  ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin: 0.3rem 0; }
+  .positive-box { background: rgba(52,211,153,0.05); border: 1px solid rgba(52,211,153,0.2); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .human-note { font-style: italic; color: var(--muted); margin: 0.5rem 0; font-size: 0.9rem; }
+  .footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); text-align: center; color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<h1>Daily Fit</h1>
+<p class="subtitle">Humanized project analysis · 27 source files · ~5,300 lines of hand-written Dart</p>
+
+<h2>What Is This?</h2>
+<p>A local-first wardrobe app that recommends daily outfits based on weather, style, and wardrobe rotation. You add clothes (photos, categories, warmth levels), and it suggests complete outfits — a top, bottom, shoes, and optional accessory. It has a Gemini AI "Stylist" mode that picks the best combos and explains <em>why</em> they work, with graceful fallback to local scoring when offline.</p>
+<p class="human-note">No cloud backend, no accounts, no data leaving the device. Your wardrobe lives in a local SQLite database. This is privacy-first done right.</p>
+
+<h2>Vitals</h2>
+<div class="vitals">
+  <div class="vital">
+    <div class="vital-label">Architecture</div>
+    <div class="vital-value good">Clean Layered ✅</div>
+    <div style="color:var(--muted);font-size:0.8rem">data / ui / models / core separation</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">State + Routing</div>
+    <div class="vital-value good">Riverpod + go_router</div>
+    <div style="color:var(--muted);font-size:0.8rem">ShellRoute tab pattern, reactive providers</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">Database</div>
+    <div class="vital-value good">drift (SQLite) v2.31</div>
+    <div style="color:var(--muted);font-size:0.8rem">typed tables, reactive streams, migration v2</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">Secrets</div>
+    <div class="vital-value good">Key-free APK ✅</div>
+    <div style="color:var(--muted);font-size:0.8rem">flutter_secure_storage, zero .env files</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">Release Network</div>
+    <div class="vital-value good">INTERNET in main ✅</div>
+    <div style="color:var(--muted);font-size:0.8rem">all 3 AndroidManifests covered</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">Git</div>
+    <div class="vital-value warn">6 commits + remote</div>
+    <div style="color:var(--muted);font-size:0.8rem">FitFlow on GitHub, 3 unstaged changes</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">Tests</div>
+    <div class="vital-value warn">5 test files</div>
+    <div style="color:var(--muted);font-size:0.8rem">recommendation engine tested well</div>
+  </div>
+  <div class="vital">
+    <div class="vital-label">Total Code</div>
+    <div class="vital-value">~5,300 LOC</div>
+    <div style="color:var(--muted);font-size:0.8rem">27 source files + 2K generated</div>
+  </div>
+</div>
+
+<h2>🟢 What's Genuinely Good</h2>
+
+<div class="positive-box">
+  <strong>Privacy-first architecture that actually delivers on its promise.</strong> The API key lives in Android Keystore via <code>flutter_secure_storage</code>, never ships in the APK, and the app degrades gracefully without it. The Gemini response is schema-validated JSON. This is the right way to handle third-party AI in a consumer app.
+</div>
+
+<table>
+  <tr><th>Strength</th><th>Where</th><th>Why It Matters</th></tr>
+  <tr><td>Two-stage recommendation engine</td><td><code>recommendation_service.dart</code></td><td>Local pre-scoring (permutations filtered by weather/laundry/recency) → top 5 → Gemini picks 2-3. Minimizes API calls, works offline, avoids token-limit issues.</td></tr>
+  <tr><td>Rating-based learning loop</td><td><code>recommendation_service.dart:109-128</code></td><td>Items from highly-rated outfits get a scoring boost. Your favourites naturally resurface. Clean implementation with defensive error handling.</td></tr>
+  <tr><td>Multi-photo with legacy fallback</td><td><code>wardrobe_repository.dart:43-54</code></td><td>Schema v2 migration adds multi-photo support. Falls back to single-photo for old items. JSON wrapped in try/catch.</td></tr>
+  <tr><td>Animated liquid glass nav + ambient gradient</td><td><code>liquid_glass_nav_bar.dart</code>, <code>main.dart:321-471</code></td><td>Custom <code>CustomPainter</code> with sinusoidal blob animations. Respects <code>disableAnimationsOf</code>. Uses <code>RepaintBoundary</code>.</td></tr>
+  <tr><td>Smart shortage explanations</td><td><code>_explainShortage()</code></td><td>When no outfit is possible, the user gets a precise reason. Not just "no outfits found."</td></tr>
+  <tr><td>No deprecated APIs</td><td>Entire <code>lib/</code></td><td>Zero <code>withOpacity</code> calls. Uses modern <code>.withValues()</code>. No <code>Placeholder</code> widgets.</td></tr>
+  <tr><td>Clean file organization</td><td>Project root</td><td>data/ui/models/core split. Every file has a single responsibility. DECISIONS.md documents why each choice was made.</td></tr>
+  <tr><td>Schema-validated Gemini responses</td><td><code>recommendation_service.dart:264-279</code></td><td>Uses <code>responseSchema</code> with typed fields. The API will reject malformed output before it reaches your code.</td></tr>
+</table>
+
+<h2>🟡 Medium — Things to Keep an Eye On</h2>
+
+<table>
+  <tr><th>Issue</th><th>Location</th><th>What's Going On</th></tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> Response parsing is lenient</td>
+    <td><code>recommendation_service.dart:318-339</code></td>
+    <td>The <em>request</em> uses <code>responseSchema</code> (good!), but the <em>parse</em> just checks <code>is! List</code> / <code>is! Map</code>. A model returning unexpected field names silently drops valid recommendations. The fallback catches it, but you could lose good suggestions.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> Custom <code>mapIndexed</code> shadows Dart's</td>
+    <td><code>recommendation_service.dart:458-465</code></td>
+    <td>Dart 2.19+ has <code>.mapIndexed</code> natively. This custom extension does the same thing. Works, but creates confusion for future readers.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> Uncommitted changes</td>
+    <td>Working tree</td>
+    <td><code>main.dart</code>, <code>nav_bar_test.dart</code>, and <code>widget_test.dart</code> are modified but not staged. Easy to lose or create merge conflicts.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> Hardcoded API key sentinel values</td>
+    <td><code>recommendation_service.dart:254</code></td>
+    <td>Checks against <code>'your_api_key_here'</code> and <code>'your_real_api_key'</code> — but the README doesn't document these. If someone's real key matched one of these, it would silently disable AI. Theoretically possible.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> No auto-location for weather</td>
+    <td><code>weather_service.dart</code></td>
+    <td>Weather depends on a manually-entered location. Could auto-detect with <code>geolocator</code>. Currently requires manual input every time.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> Weekly plan skips AI styling</td>
+    <td><code>recommendation_service.dart:353-389</code></td>
+    <td><code>generateOutfitPlan()</code> picks from pre-scored candidates without asking Gemini. The daily rec benefits from AI but the weekly plan doesn't. Inconsistent experience.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-medium">MEDIUM</span> No error states in UI screens</td>
+    <td>Various screens</td>
+    <td>If weather fetch fails or the wardrobe is empty, the UI shows empty states but doesn't surface <code>lastAiError</code> or <code>lastSelectionNote</code> from the service. Users can't see <em>why</em> they got no outfits.</td>
+  </tr>
+</table>
+
+<h2>🟢 Low — Cleanup Opportunities</h2>
+
+<table>
+  <tr><th>Item</th><th>Location</th><th>Notes</th></tr>
+  <tr><td><span class="badge badge-low">LOW</span> Flutter template comments</td><td><code>pubspec.yaml</code></td><td>Still has the default "The following line prevents..." boilerplate. Cosmetic only.</td></tr>
+  <tr><td><span class="badge badge-low">LOW</span> Project description is placeholder</td><td><code>pubspec.yaml:2</code></td><td>"A new Flutter project." — should be something meaningful for distribution.</td></tr>
+  <tr><td><span class="badge badge-low">LOW</span> No iOS launcher icons</td><td><code>pubspec.yaml:73</code></td><td><code>ios: false</code> in launcher_icons config. Fine for an Android-only personal project.</td></tr>
+  <tr><td><span class="badge badge-low">LOW</span> Stale default widget test</td><td><code>test/widget_test.dart</code></td><td>Default Flutter template test — likely references a renamed widget. May fail on <code>flutter test</code>.</td></tr>
+  <tr><td><span class="badge badge-low">LOW</span> Audio files bundled but unused</td><td><code>assets/audio/</code></td><td>5 .wav files (pluck, pop, swish, tap, whoosh) and <code>audioplayers</code> dependency declared — but no code references them. Leftover from a planned haptic/audio feedback feature?</td></tr>
+  <tr><td><span class="badge badge-low">LOW</span> <code>debugPrint</code> in production paths</td><td>Various</td><td>Clean — <code>debugPrint</code> is stripped in release builds. But zero bare <code>print()</code> calls, which is good discipline.</td></tr>
+</table>
+
+<h2>🔴 Security — Clean</h2>
+
+<div class="section-callout">
+  <strong>No critical security issues found.</strong> The repo is on GitHub (FitFlow), so this matters more than a local-only project.
+</div>
+
+<table>
+  <tr><th>Check</th><th>Result</th></tr>
+  <tr><td>Secrets in git history?</td><td class="good">✅ No. <code>git log -S 'apiKey'</code> shows only the secure-storage implementation — no literal key values.</td></tr>
+  <tr><td>.env file tracked?</td><td class="good">✅ Not in tracked files or history.</td></tr>
+  <tr><td>API key in APK?</td><td class="good">✅ Key-free. Stored only via <code>flutter_secure_storage</code> on-device.</td></tr>
+  <tr><td>INTERNET in release manifest?</td><td class="good">✅ Present in <code>src/main/AndroidManifest.xml</code> — debug, profile, and main all covered.</td></tr>
+  <tr><td>Photo file leaks on delete?</td><td class="good">✅ <code>deleteItem()</code> cleans up all photo files from disk.</td></tr>
+</table>
+
+<p class="human-note">The SECURITY.md recommends restricting the Gemini key to your package name + SHA-1 fingerprint in Google AI Studio. That's genuinely good practice — even if the key were somehow extracted, it wouldn't work from any other app.</p>
+
+<h2>Test Coverage — Honest Assessment</h2>
+
+<table>
+  <tr><th>Test File</th><th>What It Covers</th><th>Quality</th></tr>
+  <tr><td><code>recommendation_service_test.dart</code></td><td>Candidate generation, scoring, filtering, Gemini fallback</td><td class="good">Good — this is the critical path</td></tr>
+  <tr><td><code>weather_service_test.dart</code></td><td>WMO code mapping, temperature-to-warmth conversion</td><td class="good">Solid</td></tr>
+  <tr><td><code>api_key_service_test.dart</code></td><td>Secure storage read/write/delete</td><td>Adequate</td></tr>
+  <tr><td><code>nav_bar_test.dart</code></td><td>Navigation bar rendering and tap behavior</td><td>Adequate</td></tr>
+  <tr><td><code>widget_test.dart</code></td><td>Default template — likely stale</td><td class="warn">Needs update</td></tr>
+</table>
+
+<div class="section-callout">
+  <strong>What's missing:</strong> No integration tests. No tests for the WardrobeRepository (add/update/delete/markWorn). No UI screen tests. No database migration tests. The <code>tool/verify.sh</code> script exists but only does basic checks — it doesn't run <code>flutter test</code> or <code>flutter analyze</code> automatically.
+</div>
+
+<h2>Code Distribution</h2>
+
+<table>
+  <tr><th>Layer</th><th>Files</th><th>LOC</th><th>% of Source</th></tr>
+  <tr><td>UI Screens</td><td>9 files</td><td>~2,763</td><td>52%</td></tr>
+  <tr><td>UI Widgets + Theme</td><td>4 files</td><td>~935</td><td>18%</td></tr>
+  <tr><td>Data Layer</td><td>9 files</td><td>~1,055</td><td>20%</td></tr>
+  <tr><td>Core + Models</td><td>2 files</td><td>~92</td><td>2%</td></tr>
+  <tr><td>Generated (drift)</td><td>1 file</td><td>~2,009</td><td>—</td></tr>
+</table>
+
+<p class="human-note">The UI is intentionally heavy because each screen is a polished, self-contained experience — <code>home_screen.dart</code> (473 lines), <code>settings_screen.dart</code> (508 lines), and <code>add_item_screen.dart</code> (453 lines) each handle their own layout, animations, and state. This is normal for a personal project with no shared component library.</p>
+
+<h2>The Recommendation Engine — A Closer Look</h2>
+
+<p>This is the beating heart of the app, and it's thoughtfully designed.</p>
+
+<p><strong>How it works:</strong></p>
+<ol>
+  <li><strong>Filter</strong> — Remove items in laundry, incompatible with weather warmth, or home-only (when going out). Exclude upper-body items worn yesterday (wardrobe rotation).</li>
+  <li><strong>Score</strong> — For each item: <code>daysSinceWorn × 0.3 − wearCount × 0.5 + ratingBoost × 0.3</code>. This favors items you haven't worn recently, penalizes overused ones, and boosts items you've rated highly.</li>
+  <li><strong>Permute</strong> — Generate all valid upper × lower × footwear × (optional accessory) combinations. In wet weather, jackets/hoodies/sweaters get a +2 bonus.</li>
+  <li><strong>Pick top 5</strong> — Highest-scoring combos sent to Gemini for stylist selection.</li>
+  <li><strong>Gemini returns</strong> — Picks 2-3 combos with color/weather/vibe justifications. Falls back to local top 3 on any error.</li>
+</ol>
+
+<p class="human-note">The O(N³) permutation is fine for a personal wardrobe (10 uppers × 10 lowers × 8 shoes = 800 combos — trivial). The genius is that Gemini never sees your entire wardrobe, just the pre-filtered top 5. This keeps API costs near-zero and avoids token-limit issues.</p>
+
+<h2>Practical Next Steps (If You Want to Keep Going)</h2>
+
+<table>
+  <tr><th>Priority</th><th>What</th><th>Effort</th></tr>
+  <tr><td class="good">Quick win</td><td>Update <code>pubspec.yaml</code> description + remove template comments</td><td>2 min</td></tr>
+  <tr><td class="good">Quick win</td><td>Commit the 3 unstaged changes</td><td>1 min</td></tr>
+  <tr><td class="good">Quick win</td><td>Wire up or remove <code>audioplayers</code> + audio assets</td><td>10 min</td></tr>
+  <tr><td class="warn">Medium</td><td>Show <code>lastSelectionNote</code> / <code>lastAiError</code> in UI when no outfits found</td><td>1 hour</td></tr>
+  <tr><td class="warn">Medium</td><td>Send top candidates to Gemini for weekly plans too</td><td>30 min</td></tr>
+  <tr><td class="warn">Medium</td><td>Add <code>geolocator</code> for auto-detecting user's location</td><td>1 hour</td></tr>
+  <tr><td>Low effort</td><td>Delete custom <code>mapIndexed</code>, use Dart's native</td><td>5 min</td></tr>
+  <tr><td>Low effort</td><td>Update stale <code>widget_test.dart</code></td><td>15 min</td></tr>
+  <tr><td>Larger</td><td>Add repository + migration tests</td><td>2-3 hours</td></tr>
+  <tr><td>Larger</td><td>Add integration tests (flutter_driver / integration_test)</td><td>Half day</td></tr>
+</table>
+
+<div class="footer">
+  Daily Fit Analysis · Generated by Hermes · Source: 27 Dart files, 6 commits, FitFlow on GitHub
+</div>
+
+</body>
+</html>

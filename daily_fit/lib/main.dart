@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -245,7 +246,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       child: Scaffold(
         body: _ShellBackground(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 80),
+            // Content slides right up to (and can drift behind) the floating
+            // glass bar — no dead strip between bar and page.
+            padding: const EdgeInsets.only(bottom: 12),
             child: widget.child,
           ),
         ),
@@ -315,53 +318,154 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 }
 
-/// Gradient backdrop that shows through the floating glass nav bar. A soft
-/// radial glow sits behind the bar so the gap between content and glass reads
-/// as a designed stage instead of an empty dark slab.
-class _ShellBackground extends StatelessWidget {
+/// Animated ambient backdrop for the shell: a slowly drifting colour field
+/// (base gradient + three soft moving light blobs) painted on its own layer
+/// behind the page. Falls back to a static gradient when the OS has motion
+/// disabled.
+class _ShellBackground extends StatefulWidget {
   final Widget child;
   const _ShellBackground({required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
+  State<_ShellBackground> createState() => _ShellBackgroundState();
+}
 
+class _ShellBackgroundState extends State<_ShellBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _phase;
+  bool _animated = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _phase = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimationState();
+  }
+
+  void _syncAnimationState() {
+    final ok = !MediaQuery.disableAnimationsOf(context);
+    if (!ok) {
+      _phase.stop();
+      _animated = false;
+    } else if (!_animated || !_phase.isAnimating) {
+      _animated = true;
+      _phase.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _phase.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Stack(
       children: [
         Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark ? _shellDarkGradient : _shellLightGradient,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 170,
           child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, 1.4),
-                  radius: 1.3,
-                  colors: [
-                    primary.withValues(alpha: isDark ? 0.18 : 0.14),
-                    primary.withValues(alpha: 0.0),
-                  ],
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _LiveGradientPainter(
+                  isDark: Theme.of(context).brightness == Brightness.dark,
+                  primary: scheme.primary,
+                  tertiary: scheme.tertiary,
+                  phase: _animated ? _phase : null,
                 ),
+                child: const SizedBox.expand(),
               ),
             ),
           ),
         ),
-        Positioned.fill(child: child),
+        Positioned.fill(child: widget.child),
       ],
     );
   }
+}
+
+/// Paints the live background: static base gradient, two drifting colour
+/// blobs and a warm glow anchored near the bottom nav bar.
+class _LiveGradientPainter extends CustomPainter {
+  final bool isDark;
+  final Color primary;
+  final Color tertiary;
+
+  /// 0..1 loop position (null in the static fallback path).
+  final Animation<double>? phase;
+
+  _LiveGradientPainter({
+    required this.isDark,
+    required this.primary,
+    required this.tertiary,
+    required this.phase,
+  }) : super(repaint: phase);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final t = phase?.value ?? 0.0;
+
+    final base = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isDark
+            ? _shellDarkGradient
+            : _shellLightGradient,
+      ).createShader(rect);
+    canvas.drawRect(rect, base);
+
+    double wobble(double base, double amp, double speed, double ph) =>
+        base + amp * math.sin(2 * math.pi * t * speed + ph);
+
+    void blob(double cx, double cy, double radius, Color color) {
+      final center = Offset(size.width * cx, size.height * cy);
+      final paint = Paint()
+        ..shader = RadialGradient(
+          colors: [
+            color.withValues(alpha: isDark ? 0.10 : 0.12),
+            color.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: radius));
+      canvas.drawRect(rect, paint);
+    }
+
+    // Primary accent drifting upper-left.
+    blob(
+      wobble(0.18, 0.12, 0.5, 0.0),
+      wobble(0.22, 0.10, 0.4, 1.2),
+      size.width * 0.55,
+      primary,
+    );
+    // Tertiary accent drifting lower-right.
+    blob(
+      wobble(0.86, 0.10, 0.35, 3.0),
+      wobble(0.82, 0.12, 0.3, 4.5),
+      size.width * 0.6,
+      tertiary,
+    );
+    // Warm glow suspended just above the nav bar.
+    blob(
+      wobble(0.5, 0.10, 0.25, 1.8),
+      1.04,
+      size.width * 0.72,
+      primary,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _LiveGradientPainter old) =>
+      old.isDark != isDark ||
+      old.primary != primary ||
+      old.tertiary != tertiary;
 }

@@ -22,6 +22,12 @@ void main() {
   setUpAll(() {
     GoogleFonts.config.allowRuntimeFetching = false;
     Fx.enabled = false;
+    // The shell's slowly-repeating gradient would make pumpAndSettle spin;
+    // tell the app the OS prefers reduced motion so it renders the static
+    // fallback background in tests.
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
+    binding.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
   });
 
   Future<ProviderContainer> pumpApp(WidgetTester tester) async {
