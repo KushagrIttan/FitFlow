@@ -1,8 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ui/theme/app_theme.dart';
+import 'ui/widgets/liquid_glass_nav_bar.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/wardrobe_screen.dart';
 import 'ui/screens/add_item_screen.dart';
@@ -10,6 +14,7 @@ import 'ui/screens/laundry_screen.dart';
 import 'ui/screens/settings_screen.dart';
 import 'ui/screens/history_screen.dart';
 import 'ui/screens/planner_screen.dart';
+import 'ui/screens/analytics_screen.dart';
 import 'ui/screens/onboarding_screen.dart';
 import 'data/user_profile_service.dart';
 import 'data/notification_service.dart';
@@ -53,6 +58,58 @@ void main() async {
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Fade + soft-zoom page used for bottom-nav tab switches.
+_FadeZoomPage<Object?> _fadeZoomPage(Widget child, GoRouterState state) =>
+    _FadeZoomPage<Object?>(key: state.pageKey, child: child);
+
+/// A [Page] whose route fades the child in while it zooms from 0.95 up to
+/// 1.0 and the incoming surface de-blurs — a soft, glassy page swap.
+class _FadeZoomPage<T> extends Page<T> {
+  final Widget child;
+
+  const _FadeZoomPage({
+    super.key,
+    super.name,
+    super.arguments,
+    required this.child,
+  });
+
+  @override
+  Route<T> createRoute(BuildContext context) {
+    return PageRouteBuilder<T>(
+      settings: this,
+      transitionDuration: const Duration(milliseconds: 240),
+      reverseTransitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (_, __, ___) => child,
+      transitionsBuilder: (_, animation, __, child) {
+        final curved =
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+        return AnimatedBuilder(
+          animation: curved,
+          child: child,
+          builder: (context, c) {
+            final t = curved.value;
+            return Opacity(
+              opacity: t,
+              child: Transform.scale(
+                scale: 0.95 + 0.05 * t,
+                alignment: Alignment.center,
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(
+                    sigmaX: 6 * (1 - t),
+                    sigmaY: 6 * (1 - t),
+                  ),
+                  child: c,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final userProfile = ref.watch(userProfileServiceProvider);
 
@@ -79,15 +136,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const HomeScreen(),
+            pageBuilder: (context, state) =>
+                _fadeZoomPage(const HomeScreen(), state),
           ),
           GoRoute(
             path: '/wardrobe',
-            builder: (context, state) => const WardrobeScreen(),
+            pageBuilder: (context, state) =>
+                _fadeZoomPage(const WardrobeScreen(), state),
           ),
           GoRoute(
             path: '/add',
-            builder: (context, state) => const AddItemScreen(),
+            pageBuilder: (context, state) =>
+                _fadeZoomPage(const AddItemScreen(), state),
           ),
           GoRoute(
             path: '/edit',
@@ -100,15 +160,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/laundry',
-            builder: (context, state) => const LaundryScreen(),
+            pageBuilder: (context, state) =>
+                _fadeZoomPage(const LaundryScreen(), state),
           ),
           GoRoute(
             path: '/history',
             builder: (context, state) => const HistoryScreen(),
           ),
           GoRoute(
+            path: '/analytics',
+            builder: (context, state) => const AnalyticsScreen(),
+          ),
+          GoRoute(
             path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) =>
+                _fadeZoomPage(const SettingsScreen(), state),
           ),
         ],
       ),
@@ -135,47 +201,88 @@ class DailyFitApp extends ConsumerWidget {
   }
 }
 
-class AppShell extends ConsumerWidget {
+/// The fixed set of bottom-nav "tab" routes. Back on these routes never
+/// exits the app — it returns to the Home tab first (double-back to exit).
+const _tabPaths = {'/', '/wardrobe', '/add', '/laundry', '/settings'};
+
+/// Shell backdrop gradient, shared by the page background and the glass
+/// bar's ambient tint (avg of the two bottom gradient stops, sampled where
+/// the bar sits).
+const _shellDarkGradient = [Color(0xFF0F0F0F), Color(0xFF15151A), Color(0xFF0B0B0E)];
+const _shellLightGradient = [Color(0xFFF6F6F4), Color(0xFFEDEDE9), Color(0xFFF4F3EF)];
+const _navTintDark = Color(0xFF101014);
+const _navTintLight = Color(0xFFF0F0EC);
+
+class AppShell extends ConsumerStatefulWidget {
   final Widget child;
-  
+
   const AppShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final laundryCount = ref
-        .watch(wardrobeItemsProvider)
-        .maybeWhen(
-          data: (items) => items.where((i) => i.inLaundry).length,
-          orElse: () => 0,
-        );
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _calculateSelectedIndex(context),
-        onTap: (int idx) => _onItemTapped(idx, context),
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
-          const BottomNavigationBarItem(icon: Icon(Icons.checkroom_outlined), activeIcon: Icon(Icons.checkroom), label: 'Wardrobe'),
-          const BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), activeIcon: Icon(Icons.add_circle), label: 'Add'),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: laundryCount > 0,
-              label: Text('$laundryCount'),
-              child: const Icon(Icons.local_laundry_service_outlined),
-            ),
-            activeIcon: Badge(
-              isLabelVisible: laundryCount > 0,
-              label: Text('$laundryCount'),
-              child: const Icon(Icons.local_laundry_service),
-            ),
-            label: 'Laundry',
+class _AppShellState extends ConsumerState<AppShell> {
+  DateTime? _lastBackPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    final isTab = _tabPaths.contains(location);
+    // Detail pages (e.g. /edit) are pushed and may pop naturally.
+    final canPopRoute = !isTab;
+
+    return PopScope(
+      canPop: canPopRoute,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || isTab == false) return;
+        if (location == '/') {
+          _handleExitRequest();
+        } else {
+          context.go('/');
+        }
+      },
+      child: Scaffold(
+        body: _ShellBackground(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 80),
+            child: widget.child,
           ),
-          const BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), activeIcon: Icon(Icons.settings), label: 'Settings'),
-        ],
+        ),
+        bottomNavigationBar: LiquidGlassNavBar(
+          currentIndex: _calculateSelectedIndex(context),
+          laundryCount: ref
+              .watch(wardrobeItemsProvider)
+              .maybeWhen(data: (items) => items.where((i) => i.inLaundry).length, orElse: () => 0),
+          onDestinationSelected: (index) => _onItemTapped(index, context),
+          tint: Theme.of(context).brightness == Brightness.dark
+              ? _navTintDark
+              : _navTintLight,
+        ),
       ),
     );
+  }
+
+  void _handleExitRequest() {
+    final now = DateTime.now();
+    final recent = _lastBackPress != null &&
+        now.difference(_lastBackPress!) < const Duration(seconds: 2);
+
+    if (recent) {
+      SystemNavigator.pop();
+      return;
+    }
+    _lastBackPress = now;
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Press back again to exit'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   static int _calculateSelectedIndex(BuildContext context) {
@@ -205,5 +312,56 @@ class AppShell extends ConsumerWidget {
         context.go('/settings');
         break;
     }
+  }
+}
+
+/// Gradient backdrop that shows through the floating glass nav bar. A soft
+/// radial glow sits behind the bar so the gap between content and glass reads
+/// as a designed stage instead of an empty dark slab.
+class _ShellBackground extends StatelessWidget {
+  final Widget child;
+  const _ShellBackground({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark ? _shellDarkGradient : _shellLightGradient,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 170,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, 1.4),
+                  radius: 1.3,
+                  colors: [
+                    primary.withValues(alpha: isDark ? 0.18 : 0.14),
+                    primary.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(child: child),
+      ],
+    );
   }
 }

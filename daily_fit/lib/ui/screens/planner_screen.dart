@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/fx.dart';
 import '../../data/recommendation_service.dart';
 import '../../data/database.dart';
 
@@ -34,6 +34,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
 
     if (mounted) {
+      Fx.tone(FxTone.swish);
+      Fx.medium();
       setState(() {
         _isGenerating = false;
         _plan = plan;
@@ -49,7 +51,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   Future<void> _wearOutfit(RecommendedOutfit outfit) async {
-    HapticFeedback.mediumImpact();
+    Fx.tone(FxTone.whoosh);
+    Fx.medium();
     final service = ref.read(recommendationServiceProvider);
     await service.logWornOutfit(outfit, destination: 'Home', vibe: 'Plan');
     if (mounted) {

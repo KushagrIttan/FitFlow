@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
+import 'dart:convert';
 
 import 'package:daily_fit/data/database.dart';
 import 'package:daily_fit/data/recommendation_service.dart';
@@ -323,6 +324,75 @@ void main() {
       expect(logs.first.destination, 'Office');
       expect(logs.first.vibeTag, 'Casual');
     });
+
+    test('items from positively-rated outfits get a recommendation boost',
+        () async {
+      // Three identical uppers (warmth 3, never worn): A is rated highly,
+      // B is the most recent log (excluded by the no-repeat rule), C is plain.
+      final a = await insertItem(
+          category: ItemCategory.tee, zone: BodyZone.upper, warmthLevel: 3, name: 'A');
+      final b = await insertItem(
+          category: ItemCategory.tee, zone: BodyZone.upper, warmthLevel: 3, name: 'B');
+      await insertItem(
+          category: ItemCategory.tee, zone: BodyZone.upper, warmthLevel: 3, name: 'C');
+      final lower = await insertItem(
+          category: ItemCategory.jeans, zone: BodyZone.lower, name: 'Jeans');
+      final shoes = await insertItem(
+          category: ItemCategory.shoes, zone: BodyZone.footwear, name: 'Sneakers');
+
+      // Old (rated) outfit with A — not the latest log.
+      await db.into(db.outfitLogs).insert(
+            OutfitLogsCompanion.insert(
+              date: DateTime.now().subtract(const Duration(days: 7)),
+              items: '${a.id},${lower.id},${shoes.id}',
+              rating: const drift.Value(5),
+            ),
+          );
+      // Recent outfit with B so B is excluded by the no-repeat rule.
+      await db.into(db.outfitLogs).insert(
+            OutfitLogsCompanion.insert(
+              date: DateTime.now().subtract(const Duration(days: 1)),
+              items: '${b.id},${lower.id},${shoes.id}',
+            ),
+          );
+
+      final service = RecommendationService(db, _ExplodingWeatherService());
+      final recs = await service.generateRecommendations(
+        isGoingOut: false,
+        location: '',
+      );
+
+      // A (boosted) beats C (plain) for the top slot.
+      expect(recs, isNotEmpty);
+      expect(recs.first.upper.name, 'A');
+    });
+
+    test('lastAiError is null on the local fallback path', () async {
+      await seedBasicWardrobe();
+      final service = RecommendationService(
+        db,
+        _FakeWeatherService(WeatherData(temperature: 20, weatherCode: 0)),
+      );
+      await service.generateRecommendations(isGoingOut: false, location: '');
+      expect(service.lastAiError, isNull);
+    });
+
+    test('empty result explains the wardrobe shortage', () async {
+      // A tee that fails the home warmth filter (target 3 ± 1) is the only upper.
+      await insertItem(category: ItemCategory.tee, zone: BodyZone.upper, warmthLevel: 1, name: 'Tank');
+      await insertItem(category: ItemCategory.jeans, zone: BodyZone.lower, name: 'Jeans');
+      await insertItem(category: ItemCategory.shoes, zone: BodyZone.footwear, name: 'Sneakers');
+
+      final service = RecommendationService(db, _ExplodingWeatherService());
+      final recs = await service.generateRecommendations(
+        isGoingOut: false,
+        location: '',
+      );
+
+      expect(recs, isEmpty);
+      expect(service.lastSelectionNote, isNotNull);
+      expect(service.lastSelectionNote, contains('tops'));
+    });
   });
 
   group('WardrobeRepository', () {
@@ -349,6 +419,54 @@ void main() {
       await repo.markWorn([]);
       await repo.markWorn([99999]);
       // No exceptions thrown; nothing to assert beyond that.
+    });
+
+    test('setOutfitRating writes and clears a rating', () async {
+      final upper = await insertItem(
+          category: ItemCategory.tee, zone: BodyZone.upper, name: 'Tee');
+      await db.into(db.outfitLogs).insert(
+            OutfitLogsCompanion.insert(
+              date: DateTime.now(),
+              items: '${upper.id}',
+            ),
+          );
+      final log = await db.select(db.outfitLogs).getSingle();
+
+      final repo = WardrobeRepository(db);
+      await repo.setOutfitRating(log.id, 4);
+      var updated = await (db.select(db.outfitLogs)..where((t) => t.id.equals(log.id))).getSingle();
+      expect(updated.rating, 4);
+
+      // Tapping the same star clears it.
+      await repo.setOutfitRating(log.id, null);
+      updated = await (db.select(db.outfitLogs)..where((t) => t.id.equals(log.id))).getSingle();
+      expect(updated.rating, isNull);
+    });
+
+    test('itemPhotoPaths falls back to the legacy photo column', () async {
+      final repo = WardrobeRepository(db);
+      final legacy = await db.into(db.clothingItems).insert(
+            ClothingItemsCompanion.insert(
+              category: ItemCategory.tee,
+              bodyZone: BodyZone.upper,
+              fit: Fit.regular,
+              photo: '/tmp/only.jpg',
+            ),
+          );
+      final legacyItem = await (db.select(db.clothingItems)..where((t) => t.id.equals(legacy))).getSingle();
+      expect(repo.itemPhotoPaths(legacyItem), ['/tmp/only.jpg']);
+
+      final multi = await db.into(db.clothingItems).insert(
+            ClothingItemsCompanion.insert(
+              category: ItemCategory.tee,
+              bodyZone: BodyZone.upper,
+              fit: Fit.regular,
+              photo: '/tmp/a.jpg',
+              photos: drift.Value(jsonEncode(['/tmp/a.jpg', '/tmp/b.jpg'])),
+            ),
+          );
+      final multiItem = await (db.select(db.clothingItems)..where((t) => t.id.equals(multi))).getSingle();
+      expect(repo.itemPhotoPaths(multiItem), ['/tmp/a.jpg', '/tmp/b.jpg']);
     });
   });
 }

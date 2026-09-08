@@ -63,6 +63,15 @@ class RecommendationService {
   final UserProfileService? _profile;
   final String? _apiKey;
 
+  /// Last Gemini failure surfaced to the UI. Null when the last AI request
+  /// succeeded, no key is configured, or no AI request has been attempted.
+  /// Set (and never cleared) so callers can explain *why* local picks appeared.
+  String? lastAiError;
+
+  /// Human-readable explanation of why the last selection attempt produced no
+  /// outfits (e.g. missing uppers after the warmth filter). Null on success.
+  String? lastSelectionNote;
+
   RecommendationService(this._db, this._weather, [this._profile, String? apiKey])
       : _apiKey = apiKey;
 
@@ -96,6 +105,27 @@ class RecommendationService {
 
     // 1. Fetch available items
     final allItems = await _db.select(_db.clothingItems).get();
+
+    // 1b. Learn from rated outfit history: items worn in outfits the user
+    // rated highly get a scoring boost, so favourites resurface first.
+    // Wrapped defensively: a missing/incompatible column (pre-migration DB)
+    // must degrade to no learning instead of crashing the recommendation.
+    final ratedScores = <int, int>{};
+    try {
+      final ratedLogs =
+          await (_db.select(_db.outfitLogs)..where((t) => t.rating.isNotNull())).get();
+      for (final log in ratedLogs) {
+        final rating = log.rating ?? 0;
+        for (final idStr in log.items.split(',')) {
+          final id = int.tryParse(idStr);
+          if (id != null) {
+            ratedScores[id] = (ratedScores[id] ?? 0) + rating;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Rating-learning skipped: $e');
+    }
     
     // 2. Fetch last logged outfit to exclude upper body repeats
     final lastLog = await (_db.select(_db.outfitLogs)
@@ -140,19 +170,34 @@ class RecommendationService {
     ).toList();
 
     if (uppers.isEmpty || lowers.isEmpty || footwears.isEmpty) {
+      lastSelectionNote = _explainShortage(
+        allItems: allItems,
+        isGoingOut: isGoingOut,
+        targetWarmth: targetWarmth,
+        hasUpper: uppers.isNotEmpty,
+      );
       return []; // Caller handles empty state
     }
+    // Only enough base pieces? Fine — accessories are optional.
+    lastSelectionNote = null;
 
     final wet = condition == WeatherCondition.rain || condition == WeatherCondition.storm;
 
     // 3. Generate Permutations & Score
+    // An item's base score rewards recency+rotation (days since worn minus
+    // wear-count fatigue) plus a preference boost from positively-rated
+    // outfits it appeared in.
+    double itemScore(ClothingItem i) => _daysSinceWornScore(i.lastWornDate) -
+        (i.wearCount * 0.5) +
+        ((ratedScores[i.id] ?? 0) * 0.3);
+
     List<OutfitCandidate> candidates = [];
     for (final u in uppers) {
       for (final l in lowers) {
         for (final f in footwears) {
           // Add a "no accessory" permutation
           final baseItems = [u, l, f];
-          double baseScore = baseItems.fold(0.0, (s, i) => s + _daysSinceWornScore(i.lastWornDate) - (i.wearCount * 0.5));
+          double baseScore = baseItems.fold(0.0, (s, i) => s + itemScore(i));
           // In wet weather, prefer jackets/hoodies/sweaters over tees.
           if (wet && _wetWeatherUppers.contains(u.category)) {
             baseScore += 2.0;
@@ -161,7 +206,7 @@ class RecommendationService {
           
           // Add permutations with each available accessory
           for (final a in accessories) {
-            double accScore = baseScore + _daysSinceWornScore(a.lastWornDate) - (a.wearCount * 0.5);
+            double accScore = baseScore + itemScore(a);
             candidates.add(OutfitCandidate(u, l, f, a, accScore));
           }
         }
@@ -207,10 +252,12 @@ class RecommendationService {
     // 4. Send to Gemini
     final apiKey = _apiKey;
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_api_key_here' || apiKey == 'your_real_api_key') {
+      lastAiError = null;
       return fallbackRecs();
     }
 
     try {
+      lastAiError = null;
       final model = GenerativeModel(
         model: 'gemini-2.5-flash',
         apiKey: apiKey,
@@ -292,9 +339,11 @@ Pick the best 2 to 3 combinations from these options. For each, give a short, pu
       }
       
       if (results.isEmpty) return fallbackRecs();
+      lastAiError = null;
       return results;
 
     } catch (e) {
+      lastAiError = '$e';
       debugPrint('Gemini API Error: $e');
       return fallbackRecs();
     }
@@ -370,6 +419,39 @@ Pick the best 2 to 3 combinations from these options. For each, give a short, pu
     if (lastWorn == null) return 10.0;
     final days = DateTime.now().difference(lastWorn).inDays;
     return days.clamp(0, 30).toDouble() * 0.3; 
+  }
+
+  /// Builds a precise, human-readable reason when no outfit can be formed.
+  String _explainShortage({
+    required List<ClothingItem> allItems,
+    required bool isGoingOut,
+    required int targetWarmth,
+    required bool hasUpper,
+  }) {
+    List<String> reasons = [];
+    final anyUpper = allItems.any((i) =>
+        i.bodyZone == BodyZone.upper && !i.inLaundry && (!isGoingOut || !i.homeOnly));
+    if (!anyUpper) {
+      reasons.add(isGoingOut
+          ? 'Add a top to go out (remove Home-Only)'
+          : 'Add a top to your wardrobe');
+    } else if (!hasUpper) {
+      reasons.add(
+          'Your tops don\'t fit ${targetWarmth <= 2 ? 'warm' : targetWarmth >= 4 ? 'cold' : 'mild'} weather — add a warmer/cooler top or adjust warmth levels');
+    }
+
+    if (!allItems.any((i) =>
+        i.bodyZone == BodyZone.lower && !i.inLaundry && (!isGoingOut || !i.homeOnly))) {
+      reasons.add('Add a bottom');
+    }
+
+    if (!allItems.any((i) =>
+        i.bodyZone == BodyZone.footwear && !i.inLaundry && (!isGoingOut || !i.homeOnly))) {
+      reasons.add('Add a pair of shoes');
+    }
+
+    if (reasons.isEmpty) return 'Your wardrobe can\'t build a full outfit right now.';
+    return reasons.join('. ');
   }
 }
 

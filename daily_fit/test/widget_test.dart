@@ -10,11 +10,14 @@ import 'package:daily_fit/data/database.dart';
 import 'package:daily_fit/data/database_provider.dart';
 import 'package:daily_fit/data/seed_data.dart';
 import 'package:daily_fit/data/user_profile_service.dart';
+import 'package:daily_fit/core/fx.dart';
 
 void main() {
   setUpAll(() {
     // Never attempt to fetch Google Fonts over the network in tests.
     GoogleFonts.config.allowRuntimeFetching = false;
+    // Feedback f/x (sound + haptics) would hit platform channels in tests.
+    Fx.enabled = false;
   });
 
   testWidgets('first launch shows onboarding; completing it lands on Add Item',

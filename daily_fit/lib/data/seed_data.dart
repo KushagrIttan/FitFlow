@@ -14,7 +14,7 @@ Future<void> seedDatabase(AppDatabase db) async {
       color: const Value('Black'),
       fit: Fit.regular,
       photo: '',
-      warmthLevel: const Value(1),
+      warmthLevel: const Value(3),
     ),
     ClothingItemsCompanion.insert(
       category: ItemCategory.jeans,

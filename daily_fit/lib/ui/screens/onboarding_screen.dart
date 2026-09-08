@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/user_profile_service.dart';
+import '../../core/fx.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -20,6 +21,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final TextEditingController _locationController = TextEditingController();
 
   void _nextPage() {
+    Fx.tone(FxTone.tap);
+    Fx.light();
     if (_currentPage < 3) {
       _pageController.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
     } else {
@@ -90,7 +93,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 children: [
                   if (_currentPage > 0)
                     TextButton(
-                      onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                      onPressed: () {
+                        Fx.tone(FxTone.tap);
+                        Fx.light();
+                        _pageController.previousPage(duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                      },
                       child: const Text('Back'),
                     )
                   else

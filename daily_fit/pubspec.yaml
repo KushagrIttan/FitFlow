@@ -50,6 +50,7 @@ dependencies:
   flutter_timezone: 4.1.0
   share_plus: ^12.0.2
   flutter_secure_storage: ^10.3.1
+  audioplayers: 5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +90,10 @@ flutter:
 
   # NOTE: no .env asset. The Gemini API key is entered in-app and stored
   # encrypted (flutter_secure_storage) — never bundled with the binary.
+
+  assets:
+    - assets/icon/
+    - assets/audio/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

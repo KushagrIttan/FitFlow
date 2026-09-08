@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
 
 import '../../data/recommendation_service.dart';
 import '../../data/user_profile_service.dart';
+import '../../data/api_key_service.dart';
 import '../../data/database.dart';
+import '../../core/fx.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   
   bool _isGenerating = false;
   List<RecommendedOutfit> _recommendations = [];
+  String? _aiError;
   final PageController _pageController = PageController(viewportFraction: 0.9);
 
   @override
@@ -34,32 +36,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
   @override
   void dispose() {
     _pageController.dispose();
+    _locationController.dispose();
+    _vibeController.dispose();
     super.dispose();
   }
 
   Future<void> _generate() async {
+    if (_isGoingOut && _locationController.text.trim().isEmpty) {
+      Fx.tone(FxTone.tap);
+      Fx.light();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a location to get weather-aware picks')),
+      );
+      return;
+    }
+
+    Fx.tone(FxTone.swish);
+    Fx.medium();
     setState(() {
       _isGenerating = true;
       _recommendations = [];
+      _aiError = null;
     });
 
     final service = ref.read(recommendationServiceProvider);
-    final recs = await service.generateRecommendations(
-      isGoingOut: _isGoingOut,
-      location: _locationController.text,
-      vibe: _vibeController.text.isNotEmpty ? _vibeController.text : null,
-    );
+    try {
+      final recs = await service.generateRecommendations(
+        isGoingOut: _isGoingOut,
+        location: _locationController.text,
+        vibe: _vibeController.text.isNotEmpty ? _vibeController.text : null,
+      );
 
-    if (mounted) {
+      if (!mounted) return;
       setState(() {
         _isGenerating = false;
         _recommendations = recs;
+        // Surface when Gemini failed so users know why local picks appeared.
+        _aiError = recs.isNotEmpty && !recs.first.isAiSuggested && ref.read(geminiApiKeyProvider) != null
+            ? service.lastAiError
+            : null;
       });
+
+      // No outfit could be formed — tell the user why instead of silently
+      // re-showing the form.
+      if (recs.isEmpty) {
+        final note = service.lastSelectionNote ??
+            'Not enough items to build an outfit — add a top, bottom, and shoes.';
+        _showEmptyState(note);
+      }
+    } catch (e, stack) {
+      debugPrint('Recommendation failed: $e\n$stack');
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+      _showEmptyState('Something went wrong while styling you: $e\nPlease try again.');
     }
   }
 
+  void _showEmptyState(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(color: Colors.black)),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+  }
+
   Future<void> _wearOutfit(RecommendedOutfit outfit) async {
-    HapticFeedback.mediumImpact();
+    Fx.tone(FxTone.whoosh);
+    Fx.medium();
     final service = ref.read(recommendationServiceProvider);
     await service.logWornOutfit(
       outfit,
@@ -204,6 +252,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_aiError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Material(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onErrorContainer),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'AI styling hit an error — showing local picks: $_aiError',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.onErrorContainer),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _aiError = null),
+                      child: Icon(Icons.close,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onErrorContainer),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Row(

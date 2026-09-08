@@ -17,6 +17,9 @@ class ClothingItems extends Table {
   TextColumn get color => text().nullable()();
   IntColumn get fit => intEnum<Fit>()();
   TextColumn get photo => text()();
+  /// JSON array of all photo paths; index 0 equals [photo] (the cover).
+  /// Null for legacy items with a single photo.
+  TextColumn get photos => text().nullable()();
   BoolColumn get homeOnly => boolean().withDefault(const Constant(false))();
   IntColumn get warmthLevel => integer().withDefault(const Constant(3))();
   BoolColumn get inLaundry => boolean().withDefault(const Constant(false))();
@@ -34,6 +37,9 @@ class OutfitLogs extends Table {
   TextColumn get vibeTag => text().nullable()();
   TextColumn get weatherSnapshot => text().nullable()();
   BoolColumn get wasAiSuggested => boolean().withDefault(const Constant(false))();
+  /// Optional user rating (1-5). Used by the recommendation engine to learn
+  /// which items appear in outfits the user actually liked.
+  IntColumn get rating => integer().nullable()();
 }
 
 @DriftDatabase(tables: [ClothingItems, OutfitLogs])
@@ -43,7 +49,18 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(clothingItems, clothingItems.photos);
+            await m.addColumn(outfitLogs, outfitLogs.rating);
+          }
+        },
+      );
 }
 
 LazyDatabase _openConnection() {

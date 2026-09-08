@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/fx.dart';
 import '../../data/wardrobe_repository.dart';
 import '../widgets/empty_state.dart';
 
@@ -40,6 +41,8 @@ class LaundryScreen extends ConsumerWidget {
                 subtitle: Text(item.color ?? ''),
                 trailing: ElevatedButton(
                   onPressed: () {
+                    Fx.tone(FxTone.pop);
+                    Fx.light();
                     ref.read(wardrobeRepositoryProvider).toggleLaundry(item.id, false);
                   },
                   child: const Text('Mark Washed'),

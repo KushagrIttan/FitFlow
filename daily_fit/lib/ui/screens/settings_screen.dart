@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/fx.dart';
 import '../../data/user_profile_service.dart';
 import '../../data/database_provider.dart';
 import '../../data/backup_service.dart';
@@ -111,6 +112,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(geminiApiKeyProvider.notifier).setKey(key);
     _apiKeyController.clear();
     if (mounted) {
+      Fx.tone(FxTone.pop);
+      Fx.light();
       setState(() => _verifyResult = null);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('API key saved securely on this device')),
@@ -133,6 +136,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final service = ref.read(recommendationServiceProvider);
     final ok = await service.verifyApiKey(key);
     if (mounted) {
+      if (ok) {
+        Fx.tone(FxTone.pluck);
+        Fx.light();
+      } else {
+        Fx.tone(FxTone.tap);
+        Fx.light();
+      }
       setState(() {
         _isVerifying = false;
         _verifyResult = ok;
@@ -141,6 +151,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _clearApiKey() async {
+    Fx.tone(FxTone.tap);
+    Fx.light();
     await ref.read(geminiApiKeyProvider.notifier).clear();
     _apiKeyController.clear();
     if (mounted) {
@@ -438,14 +450,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: const Text('Outfit Plan'),
                   subtitle: const Text('Plan a week or a trip without repeats'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/plan'),
+                  onTap: () => context.push('/plan'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.history),
                   title: const Text('Outfit History'),
                   subtitle: const Text('Everything you\'ve worn'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/history'),
+                  onTap: () => context.push('/history'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.insights),
+                  title: const Text('Closet Insights'),
+                  subtitle: const Text('Wear stats, neglected pieces, trends'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/analytics'),
                 ),
                 ListTile(
                   leading: _isExporting

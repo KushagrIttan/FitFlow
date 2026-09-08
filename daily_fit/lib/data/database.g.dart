@@ -76,6 +76,15 @@ class $ClothingItemsTable extends ClothingItems
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _photosMeta = const VerificationMeta('photos');
+  @override
+  late final GeneratedColumn<String> photos = GeneratedColumn<String>(
+    'photos',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _homeOnlyMeta = const VerificationMeta(
     'homeOnly',
   );
@@ -162,6 +171,7 @@ class $ClothingItemsTable extends ClothingItems
     color,
     fit,
     photo,
+    photos,
     homeOnly,
     warmthLevel,
     inLaundry,
@@ -203,6 +213,12 @@ class $ClothingItemsTable extends ClothingItems
       );
     } else if (isInserting) {
       context.missing(_photoMeta);
+    }
+    if (data.containsKey('photos')) {
+      context.handle(
+        _photosMeta,
+        photos.isAcceptableOrUnknown(data['photos']!, _photosMeta),
+      );
     }
     if (data.containsKey('home_only')) {
       context.handle(
@@ -291,6 +307,10 @@ class $ClothingItemsTable extends ClothingItems
             DriftSqlType.string,
             data['${effectivePrefix}photo'],
           )!,
+      photos: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photos'],
+      ),
       homeOnly:
           attachedDatabase.typeMapping.read(
             DriftSqlType.bool,
@@ -344,6 +364,10 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
   final String? color;
   final Fit fit;
   final String photo;
+
+  /// JSON array of all photo paths; index 0 equals [photo] (the cover).
+  /// Null for legacy items with a single photo.
+  final String? photos;
   final bool homeOnly;
   final int warmthLevel;
   final bool inLaundry;
@@ -358,6 +382,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
     this.color,
     required this.fit,
     required this.photo,
+    this.photos,
     required this.homeOnly,
     required this.warmthLevel,
     required this.inLaundry,
@@ -389,6 +414,9 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
       map['fit'] = Variable<int>($ClothingItemsTable.$converterfit.toSql(fit));
     }
     map['photo'] = Variable<String>(photo);
+    if (!nullToAbsent || photos != null) {
+      map['photos'] = Variable<String>(photos);
+    }
     map['home_only'] = Variable<bool>(homeOnly);
     map['warmth_level'] = Variable<int>(warmthLevel);
     map['in_laundry'] = Variable<bool>(inLaundry);
@@ -410,6 +438,8 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
           color == null && nullToAbsent ? const Value.absent() : Value(color),
       fit: Value(fit),
       photo: Value(photo),
+      photos:
+          photos == null && nullToAbsent ? const Value.absent() : Value(photos),
       homeOnly: Value(homeOnly),
       warmthLevel: Value(warmthLevel),
       inLaundry: Value(inLaundry),
@@ -441,6 +471,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
         serializer.fromJson<int>(json['fit']),
       ),
       photo: serializer.fromJson<String>(json['photo']),
+      photos: serializer.fromJson<String?>(json['photos']),
       homeOnly: serializer.fromJson<bool>(json['homeOnly']),
       warmthLevel: serializer.fromJson<int>(json['warmthLevel']),
       inLaundry: serializer.fromJson<bool>(json['inLaundry']),
@@ -466,6 +497,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
         $ClothingItemsTable.$converterfit.toJson(fit),
       ),
       'photo': serializer.toJson<String>(photo),
+      'photos': serializer.toJson<String?>(photos),
       'homeOnly': serializer.toJson<bool>(homeOnly),
       'warmthLevel': serializer.toJson<int>(warmthLevel),
       'inLaundry': serializer.toJson<bool>(inLaundry),
@@ -483,6 +515,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
     Value<String?> color = const Value.absent(),
     Fit? fit,
     String? photo,
+    Value<String?> photos = const Value.absent(),
     bool? homeOnly,
     int? warmthLevel,
     bool? inLaundry,
@@ -497,6 +530,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
     color: color.present ? color.value : this.color,
     fit: fit ?? this.fit,
     photo: photo ?? this.photo,
+    photos: photos.present ? photos.value : this.photos,
     homeOnly: homeOnly ?? this.homeOnly,
     warmthLevel: warmthLevel ?? this.warmthLevel,
     inLaundry: inLaundry ?? this.inLaundry,
@@ -513,6 +547,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
       color: data.color.present ? data.color.value : this.color,
       fit: data.fit.present ? data.fit.value : this.fit,
       photo: data.photo.present ? data.photo.value : this.photo,
+      photos: data.photos.present ? data.photos.value : this.photos,
       homeOnly: data.homeOnly.present ? data.homeOnly.value : this.homeOnly,
       warmthLevel:
           data.warmthLevel.present ? data.warmthLevel.value : this.warmthLevel,
@@ -536,6 +571,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
           ..write('color: $color, ')
           ..write('fit: $fit, ')
           ..write('photo: $photo, ')
+          ..write('photos: $photos, ')
           ..write('homeOnly: $homeOnly, ')
           ..write('warmthLevel: $warmthLevel, ')
           ..write('inLaundry: $inLaundry, ')
@@ -555,6 +591,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
     color,
     fit,
     photo,
+    photos,
     homeOnly,
     warmthLevel,
     inLaundry,
@@ -573,6 +610,7 @@ class ClothingItem extends DataClass implements Insertable<ClothingItem> {
           other.color == this.color &&
           other.fit == this.fit &&
           other.photo == this.photo &&
+          other.photos == this.photos &&
           other.homeOnly == this.homeOnly &&
           other.warmthLevel == this.warmthLevel &&
           other.inLaundry == this.inLaundry &&
@@ -589,6 +627,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
   final Value<String?> color;
   final Value<Fit> fit;
   final Value<String> photo;
+  final Value<String?> photos;
   final Value<bool> homeOnly;
   final Value<int> warmthLevel;
   final Value<bool> inLaundry;
@@ -603,6 +642,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
     this.color = const Value.absent(),
     this.fit = const Value.absent(),
     this.photo = const Value.absent(),
+    this.photos = const Value.absent(),
     this.homeOnly = const Value.absent(),
     this.warmthLevel = const Value.absent(),
     this.inLaundry = const Value.absent(),
@@ -618,6 +658,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
     this.color = const Value.absent(),
     required Fit fit,
     required String photo,
+    this.photos = const Value.absent(),
     this.homeOnly = const Value.absent(),
     this.warmthLevel = const Value.absent(),
     this.inLaundry = const Value.absent(),
@@ -636,6 +677,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
     Expression<String>? color,
     Expression<int>? fit,
     Expression<String>? photo,
+    Expression<String>? photos,
     Expression<bool>? homeOnly,
     Expression<int>? warmthLevel,
     Expression<bool>? inLaundry,
@@ -651,6 +693,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
       if (color != null) 'color': color,
       if (fit != null) 'fit': fit,
       if (photo != null) 'photo': photo,
+      if (photos != null) 'photos': photos,
       if (homeOnly != null) 'home_only': homeOnly,
       if (warmthLevel != null) 'warmth_level': warmthLevel,
       if (inLaundry != null) 'in_laundry': inLaundry,
@@ -668,6 +711,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
     Value<String?>? color,
     Value<Fit>? fit,
     Value<String>? photo,
+    Value<String?>? photos,
     Value<bool>? homeOnly,
     Value<int>? warmthLevel,
     Value<bool>? inLaundry,
@@ -683,6 +727,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
       color: color ?? this.color,
       fit: fit ?? this.fit,
       photo: photo ?? this.photo,
+      photos: photos ?? this.photos,
       homeOnly: homeOnly ?? this.homeOnly,
       warmthLevel: warmthLevel ?? this.warmthLevel,
       inLaundry: inLaundry ?? this.inLaundry,
@@ -722,6 +767,9 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
     if (photo.present) {
       map['photo'] = Variable<String>(photo.value);
     }
+    if (photos.present) {
+      map['photos'] = Variable<String>(photos.value);
+    }
     if (homeOnly.present) {
       map['home_only'] = Variable<bool>(homeOnly.value);
     }
@@ -753,6 +801,7 @@ class ClothingItemsCompanion extends UpdateCompanion<ClothingItem> {
           ..write('color: $color, ')
           ..write('fit: $fit, ')
           ..write('photo: $photo, ')
+          ..write('photos: $photos, ')
           ..write('homeOnly: $homeOnly, ')
           ..write('warmthLevel: $warmthLevel, ')
           ..write('inLaundry: $inLaundry, ')
@@ -849,6 +898,15 @@ class $OutfitLogsTable extends OutfitLogs
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _ratingMeta = const VerificationMeta('rating');
+  @override
+  late final GeneratedColumn<int> rating = GeneratedColumn<int>(
+    'rating',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -858,6 +916,7 @@ class $OutfitLogsTable extends OutfitLogs
     vibeTag,
     weatherSnapshot,
     wasAiSuggested,
+    rating,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -923,6 +982,12 @@ class $OutfitLogsTable extends OutfitLogs
         ),
       );
     }
+    if (data.containsKey('rating')) {
+      context.handle(
+        _ratingMeta,
+        rating.isAcceptableOrUnknown(data['rating']!, _ratingMeta),
+      );
+    }
     return context;
   }
 
@@ -964,6 +1029,10 @@ class $OutfitLogsTable extends OutfitLogs
             DriftSqlType.bool,
             data['${effectivePrefix}was_ai_suggested'],
           )!,
+      rating: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rating'],
+      ),
     );
   }
 
@@ -981,6 +1050,10 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
   final String? vibeTag;
   final String? weatherSnapshot;
   final bool wasAiSuggested;
+
+  /// Optional user rating (1-5). Used by the recommendation engine to learn
+  /// which items appear in outfits the user actually liked.
+  final int? rating;
   const OutfitLog({
     required this.id,
     required this.date,
@@ -989,6 +1062,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
     this.vibeTag,
     this.weatherSnapshot,
     required this.wasAiSuggested,
+    this.rating,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1006,6 +1080,9 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
       map['weather_snapshot'] = Variable<String>(weatherSnapshot);
     }
     map['was_ai_suggested'] = Variable<bool>(wasAiSuggested);
+    if (!nullToAbsent || rating != null) {
+      map['rating'] = Variable<int>(rating);
+    }
     return map;
   }
 
@@ -1027,6 +1104,8 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
               ? const Value.absent()
               : Value(weatherSnapshot),
       wasAiSuggested: Value(wasAiSuggested),
+      rating:
+          rating == null && nullToAbsent ? const Value.absent() : Value(rating),
     );
   }
 
@@ -1043,6 +1122,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
       vibeTag: serializer.fromJson<String?>(json['vibeTag']),
       weatherSnapshot: serializer.fromJson<String?>(json['weatherSnapshot']),
       wasAiSuggested: serializer.fromJson<bool>(json['wasAiSuggested']),
+      rating: serializer.fromJson<int?>(json['rating']),
     );
   }
   @override
@@ -1056,6 +1136,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
       'vibeTag': serializer.toJson<String?>(vibeTag),
       'weatherSnapshot': serializer.toJson<String?>(weatherSnapshot),
       'wasAiSuggested': serializer.toJson<bool>(wasAiSuggested),
+      'rating': serializer.toJson<int?>(rating),
     };
   }
 
@@ -1067,6 +1148,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
     Value<String?> vibeTag = const Value.absent(),
     Value<String?> weatherSnapshot = const Value.absent(),
     bool? wasAiSuggested,
+    Value<int?> rating = const Value.absent(),
   }) => OutfitLog(
     id: id ?? this.id,
     date: date ?? this.date,
@@ -1076,6 +1158,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
     weatherSnapshot:
         weatherSnapshot.present ? weatherSnapshot.value : this.weatherSnapshot,
     wasAiSuggested: wasAiSuggested ?? this.wasAiSuggested,
+    rating: rating.present ? rating.value : this.rating,
   );
   OutfitLog copyWithCompanion(OutfitLogsCompanion data) {
     return OutfitLog(
@@ -1093,6 +1176,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
           data.wasAiSuggested.present
               ? data.wasAiSuggested.value
               : this.wasAiSuggested,
+      rating: data.rating.present ? data.rating.value : this.rating,
     );
   }
 
@@ -1105,7 +1189,8 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
           ..write('destination: $destination, ')
           ..write('vibeTag: $vibeTag, ')
           ..write('weatherSnapshot: $weatherSnapshot, ')
-          ..write('wasAiSuggested: $wasAiSuggested')
+          ..write('wasAiSuggested: $wasAiSuggested, ')
+          ..write('rating: $rating')
           ..write(')'))
         .toString();
   }
@@ -1119,6 +1204,7 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
     vibeTag,
     weatherSnapshot,
     wasAiSuggested,
+    rating,
   );
   @override
   bool operator ==(Object other) =>
@@ -1130,7 +1216,8 @@ class OutfitLog extends DataClass implements Insertable<OutfitLog> {
           other.destination == this.destination &&
           other.vibeTag == this.vibeTag &&
           other.weatherSnapshot == this.weatherSnapshot &&
-          other.wasAiSuggested == this.wasAiSuggested);
+          other.wasAiSuggested == this.wasAiSuggested &&
+          other.rating == this.rating);
 }
 
 class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
@@ -1141,6 +1228,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
   final Value<String?> vibeTag;
   final Value<String?> weatherSnapshot;
   final Value<bool> wasAiSuggested;
+  final Value<int?> rating;
   const OutfitLogsCompanion({
     this.id = const Value.absent(),
     this.date = const Value.absent(),
@@ -1149,6 +1237,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
     this.vibeTag = const Value.absent(),
     this.weatherSnapshot = const Value.absent(),
     this.wasAiSuggested = const Value.absent(),
+    this.rating = const Value.absent(),
   });
   OutfitLogsCompanion.insert({
     this.id = const Value.absent(),
@@ -1158,6 +1247,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
     this.vibeTag = const Value.absent(),
     this.weatherSnapshot = const Value.absent(),
     this.wasAiSuggested = const Value.absent(),
+    this.rating = const Value.absent(),
   }) : date = Value(date),
        items = Value(items);
   static Insertable<OutfitLog> custom({
@@ -1168,6 +1258,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
     Expression<String>? vibeTag,
     Expression<String>? weatherSnapshot,
     Expression<bool>? wasAiSuggested,
+    Expression<int>? rating,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1177,6 +1268,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
       if (vibeTag != null) 'vibe_tag': vibeTag,
       if (weatherSnapshot != null) 'weather_snapshot': weatherSnapshot,
       if (wasAiSuggested != null) 'was_ai_suggested': wasAiSuggested,
+      if (rating != null) 'rating': rating,
     });
   }
 
@@ -1188,6 +1280,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
     Value<String?>? vibeTag,
     Value<String?>? weatherSnapshot,
     Value<bool>? wasAiSuggested,
+    Value<int?>? rating,
   }) {
     return OutfitLogsCompanion(
       id: id ?? this.id,
@@ -1197,6 +1290,7 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
       vibeTag: vibeTag ?? this.vibeTag,
       weatherSnapshot: weatherSnapshot ?? this.weatherSnapshot,
       wasAiSuggested: wasAiSuggested ?? this.wasAiSuggested,
+      rating: rating ?? this.rating,
     );
   }
 
@@ -1224,6 +1318,9 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
     if (wasAiSuggested.present) {
       map['was_ai_suggested'] = Variable<bool>(wasAiSuggested.value);
     }
+    if (rating.present) {
+      map['rating'] = Variable<int>(rating.value);
+    }
     return map;
   }
 
@@ -1236,7 +1333,8 @@ class OutfitLogsCompanion extends UpdateCompanion<OutfitLog> {
           ..write('destination: $destination, ')
           ..write('vibeTag: $vibeTag, ')
           ..write('weatherSnapshot: $weatherSnapshot, ')
-          ..write('wasAiSuggested: $wasAiSuggested')
+          ..write('wasAiSuggested: $wasAiSuggested, ')
+          ..write('rating: $rating')
           ..write(')'))
         .toString();
   }
@@ -1266,6 +1364,7 @@ typedef $$ClothingItemsTableCreateCompanionBuilder =
       Value<String?> color,
       required Fit fit,
       required String photo,
+      Value<String?> photos,
       Value<bool> homeOnly,
       Value<int> warmthLevel,
       Value<bool> inLaundry,
@@ -1282,6 +1381,7 @@ typedef $$ClothingItemsTableUpdateCompanionBuilder =
       Value<String?> color,
       Value<Fit> fit,
       Value<String> photo,
+      Value<String?> photos,
       Value<bool> homeOnly,
       Value<int> warmthLevel,
       Value<bool> inLaundry,
@@ -1333,6 +1433,11 @@ class $$ClothingItemsTableFilterComposer
 
   ColumnFilters<String> get photo => $composableBuilder(
     column: $table.photo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photos => $composableBuilder(
+    column: $table.photos,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1411,6 +1516,11 @@ class $$ClothingItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get photos => $composableBuilder(
+    column: $table.photos,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get homeOnly => $composableBuilder(
     column: $table.homeOnly,
     builder: (column) => ColumnOrderings(column),
@@ -1471,6 +1581,9 @@ class $$ClothingItemsTableAnnotationComposer
 
   GeneratedColumn<String> get photo =>
       $composableBuilder(column: $table.photo, builder: (column) => column);
+
+  GeneratedColumn<String> get photos =>
+      $composableBuilder(column: $table.photos, builder: (column) => column);
 
   GeneratedColumn<bool> get homeOnly =>
       $composableBuilder(column: $table.homeOnly, builder: (column) => column);
@@ -1537,6 +1650,7 @@ class $$ClothingItemsTableTableManager
                 Value<String?> color = const Value.absent(),
                 Value<Fit> fit = const Value.absent(),
                 Value<String> photo = const Value.absent(),
+                Value<String?> photos = const Value.absent(),
                 Value<bool> homeOnly = const Value.absent(),
                 Value<int> warmthLevel = const Value.absent(),
                 Value<bool> inLaundry = const Value.absent(),
@@ -1551,6 +1665,7 @@ class $$ClothingItemsTableTableManager
                 color: color,
                 fit: fit,
                 photo: photo,
+                photos: photos,
                 homeOnly: homeOnly,
                 warmthLevel: warmthLevel,
                 inLaundry: inLaundry,
@@ -1567,6 +1682,7 @@ class $$ClothingItemsTableTableManager
                 Value<String?> color = const Value.absent(),
                 required Fit fit,
                 required String photo,
+                Value<String?> photos = const Value.absent(),
                 Value<bool> homeOnly = const Value.absent(),
                 Value<int> warmthLevel = const Value.absent(),
                 Value<bool> inLaundry = const Value.absent(),
@@ -1581,6 +1697,7 @@ class $$ClothingItemsTableTableManager
                 color: color,
                 fit: fit,
                 photo: photo,
+                photos: photos,
                 homeOnly: homeOnly,
                 warmthLevel: warmthLevel,
                 inLaundry: inLaundry,
@@ -1629,6 +1746,7 @@ typedef $$OutfitLogsTableCreateCompanionBuilder =
       Value<String?> vibeTag,
       Value<String?> weatherSnapshot,
       Value<bool> wasAiSuggested,
+      Value<int?> rating,
     });
 typedef $$OutfitLogsTableUpdateCompanionBuilder =
     OutfitLogsCompanion Function({
@@ -1639,6 +1757,7 @@ typedef $$OutfitLogsTableUpdateCompanionBuilder =
       Value<String?> vibeTag,
       Value<String?> weatherSnapshot,
       Value<bool> wasAiSuggested,
+      Value<int?> rating,
     });
 
 class $$OutfitLogsTableFilterComposer
@@ -1682,6 +1801,11 @@ class $$OutfitLogsTableFilterComposer
 
   ColumnFilters<bool> get wasAiSuggested => $composableBuilder(
     column: $table.wasAiSuggested,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rating => $composableBuilder(
+    column: $table.rating,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1729,6 +1853,11 @@ class $$OutfitLogsTableOrderingComposer
     column: $table.wasAiSuggested,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get rating => $composableBuilder(
+    column: $table.rating,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$OutfitLogsTableAnnotationComposer
@@ -1766,6 +1895,9 @@ class $$OutfitLogsTableAnnotationComposer
     column: $table.wasAiSuggested,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get rating =>
+      $composableBuilder(column: $table.rating, builder: (column) => column);
 }
 
 class $$OutfitLogsTableTableManager
@@ -1806,6 +1938,7 @@ class $$OutfitLogsTableTableManager
                 Value<String?> vibeTag = const Value.absent(),
                 Value<String?> weatherSnapshot = const Value.absent(),
                 Value<bool> wasAiSuggested = const Value.absent(),
+                Value<int?> rating = const Value.absent(),
               }) => OutfitLogsCompanion(
                 id: id,
                 date: date,
@@ -1814,6 +1947,7 @@ class $$OutfitLogsTableTableManager
                 vibeTag: vibeTag,
                 weatherSnapshot: weatherSnapshot,
                 wasAiSuggested: wasAiSuggested,
+                rating: rating,
               ),
           createCompanionCallback:
               ({
@@ -1824,6 +1958,7 @@ class $$OutfitLogsTableTableManager
                 Value<String?> vibeTag = const Value.absent(),
                 Value<String?> weatherSnapshot = const Value.absent(),
                 Value<bool> wasAiSuggested = const Value.absent(),
+                Value<int?> rating = const Value.absent(),
               }) => OutfitLogsCompanion.insert(
                 id: id,
                 date: date,
@@ -1832,6 +1967,7 @@ class $$OutfitLogsTableTableManager
                 vibeTag: vibeTag,
                 weatherSnapshot: weatherSnapshot,
                 wasAiSuggested: wasAiSuggested,
+                rating: rating,
               ),
           withReferenceMapper:
               (p0) =>
