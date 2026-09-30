@@ -53,7 +53,8 @@ dependencies:
   audioplayers: 5.2.1
   geolocator: ^13.0.2
   geocoding: ^3.0.0
-  purchases_flutter: ^8.0.0
+  purchases_flutter: ^10.10.0
+  purchases_ui_flutter: ^10.10.0
   flutter_dotenv: ^5.2.1
 
 dev_dependencies:

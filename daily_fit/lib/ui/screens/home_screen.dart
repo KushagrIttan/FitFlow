@@ -296,7 +296,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                   value: _isGoingOut,
                   onChanged: _toggleGoingOut,
-                  activeColor: Theme.of(context).colorScheme.primary,
+                  activeThumbColor: Theme.of(context).colorScheme.primary,
                   contentPadding: EdgeInsets.zero,
                 ),
                 

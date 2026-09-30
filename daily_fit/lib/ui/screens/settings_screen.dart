@@ -12,6 +12,7 @@ import '../../data/theme_mode_provider.dart';
 import '../../data/api_key_service.dart';
 import '../../data/purchases_service.dart';
 import '../../data/recommendation_service.dart';
+import 'paywall_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -192,51 +193,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       return;
     }
-    final offerings = await service.offerings();
-    if (!mounted) return;
-    final packages = offerings?.current?.availablePackages ?? [];
-    if (packages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No plans available right now — check back soon'),
-        ),
+    // RevenueCat Paywall (current offering) as a full page — PaywallView
+    // must not live in a modal/bottom sheet. Pro status refreshes via the
+    // CustomerInfo listener + onDismiss in PaywallScreen.
+    if (mounted) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PaywallScreen()),
       );
+      ref.invalidate(isProProvider);
+    }
+  }
+
+  Future<void> _manageSubscription() async {
+    final service = ref.read(purchasesServiceProvider);
+    if (!service.isConfigured) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Pro billing is not configured yet — add your RevenueCat key to .env'),
+          ),
+        );
+      }
       return;
     }
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(
-              title: Text('Daily Fit Pro'),
-              subtitle: Text('Unlimited AI styling, plans & insights'),
-            ),
-            for (final package in packages)
-              ListTile(
-                title: Text(package.storeProduct.title),
-                subtitle: Text(package.storeProduct.priceString),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  Navigator.of(sheetContext).pop();
-                  final ok = await service.purchasePackage(package);
-                  ref.invalidate(isProProvider);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(ok
-                            ? 'Pro unlocked — enjoy!'
-                            : 'Purchase cancelled'),
-                      ),
-                    );
-                  }
-                },
-              ),
-          ],
-        ),
-      ),
-    );
+    await service.presentCustomerCenter();
+    ref.invalidate(isProProvider);
   }
 
   Future<void> _exportBackup() async {
@@ -516,6 +498,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: _manageSubscription,
+                      icon: const Icon(Icons.manage_accounts_outlined, size: 18),
+                      label: const Text('Manage subscription'),
+                    ),
                   ),
                 ],
               ),

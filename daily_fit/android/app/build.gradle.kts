@@ -27,8 +27,9 @@ android {
         applicationId = "com.fitflow.dailyfit"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // minSdk 23 required by flutter_secure_storage (Android 6.0+; covers ~98% of devices).
-        minSdk = 23
+        // minSdk 24: required by purchases_ui_flutter (RevenueCat Paywalls
+        // only work on Android 24+). Overrides the Flutter default.
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

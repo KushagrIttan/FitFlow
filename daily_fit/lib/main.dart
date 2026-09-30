@@ -54,8 +54,16 @@ void main() async {
   // recommendations can use it from the very first frame.
   await container.read(geminiApiKeyProvider.notifier).loadFromStorage();
   // RevenueCat Pro (safe no-op when no key is configured).
+  // Live entitlement updates: any purchase/restore/renewal refreshes Pro UI.
   try {
-    await container.read(purchasesServiceProvider).init();
+    final purchases = container.read(purchasesServiceProvider);
+    purchases.onCustomerInfoChanged = () {
+      try {
+        container.invalidate(isProProvider);
+        container.invalidate(offeringsProvider);
+      } catch (_) {}
+    };
+    await purchases.init();
   } catch (e) {
     debugPrint('Purchases init failed: $e');
   }

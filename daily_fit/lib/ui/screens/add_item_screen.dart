@@ -209,7 +209,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
 
               DropdownButtonFormField<ItemCategory>(
                 decoration: const InputDecoration(labelText: 'Category *', border: OutlineInputBorder()),
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 items: ItemCategory.values.map((c) {
                   return DropdownMenuItem(value: c, child: Text(c.name.toUpperCase()));
                 }).toList(),
@@ -225,7 +225,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
 
               DropdownButtonFormField<Fit>(
                 decoration: const InputDecoration(labelText: 'Fit *', border: OutlineInputBorder()),
-                value: _selectedFit,
+                initialValue: _selectedFit,
                 items: Fit.values.map((f) {
                   return DropdownMenuItem(value: f, child: Text(f.name.toUpperCase()));
                 }).toList(),
@@ -283,7 +283,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                 subtitle: const Text('Exclude from "Going Out" recommendations'),
                 value: _homeOnly,
                 onChanged: (val) => setState(() => _homeOnly = val),
-                activeColor: Theme.of(context).colorScheme.primary,
+                activeThumbColor: Theme.of(context).colorScheme.primary,
               ),
 
               const SizedBox(height: 32),

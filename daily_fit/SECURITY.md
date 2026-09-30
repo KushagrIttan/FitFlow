@@ -39,6 +39,13 @@ design (it cannot be used to spend or refund anything).
   is the committed template),
 - only sent to RevenueCat's API when checking Pro status / purchasing.
 
+**Test vs release keys:** `.env` currently holds a Test Store key (`test_...`),
+which works in debug builds with RC test products and no Play setup. It must
+**never ship in a release/Play build** — the SDK crashes on purpose with test
+keys in release. Release builds take the Google platform key (`goog_...`) via
+`--dart-define=REVENUECAT_ANDROID_KEY=...`; `PurchasesService.init()` also
+refuses to configure a test key in release mode as a second guard.
+
 Without a key the app runs fully in free/local mode and
 **Settings → Daily Fit Pro** shows "Billing is not configured".
 

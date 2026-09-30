@@ -19,11 +19,18 @@ dart run build_runner build --delete-conflicting-outputs
 ```
 
 ### 2. Configure keys (both optional — the app runs free/local without them)
-* **RevenueCat (Pro billing):** paste your public SDK key as
-  `REVENUECAT_ANDROID_KEY=goog_...` in `.env`
-  (or pass `--dart-define=REVENUECAT_ANDROID_KEY=goog_...`).
-  Without it the app runs in free mode and **Settings → Daily Fit Pro**
-  shows "Billing is not configured".
+* **RevenueCat (Pro billing):** `.env` already holds a Test Store key, so
+  debug builds get working test purchases with RC test products and no Play
+  Console setup. Dashboard setup for real products:
+  1. Play Console → create Lifetime / Yearly / Monthly products.
+  2. RevenueCat → import them, attach all three to the `fitflow_pro`
+     entitlement, add `$rc_lifetime` / `$rc_annual` / `$rc_monthly` packages
+     to the **Current** offering, design a paywall for it.
+  3. In-app: **Settings → Daily Fit Pro → View plans** (Paywall),
+     **Manage subscription** (Customer Center).
+  Release builds must use the Google platform key:
+  `flutter build apk --release --dart-define=REVENUECAT_ANDROID_KEY=goog_...`
+  (test keys crash release builds on purpose).
 * **Gemini (AI styling):** open **Settings → AI Stylist** inside the app,
   paste your key (from
   [aistudio.google.com/apikey](https://aistudio.google.com/apikey)),
