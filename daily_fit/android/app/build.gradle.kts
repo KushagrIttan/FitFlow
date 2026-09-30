@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.daily_fit"
+    namespace = "com.fitflow.dailyfit"
     // flutter_secure_storage 10.x requires compileSdk 36.
     compileSdk = 36
     ndkVersion = "27.0.12077973"
@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.daily_fit"
+        applicationId = "com.fitflow.dailyfit"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // minSdk 23 required by flutter_secure_storage (Android 6.0+; covers ~98% of devices).

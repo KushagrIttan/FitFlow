@@ -1,4 +1,4 @@
-package com.example.daily_fit
+package com.fitflow.dailyfit
 
 import io.flutter.embedding.android.FlutterActivity
 

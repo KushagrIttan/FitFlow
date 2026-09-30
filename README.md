@@ -19,9 +19,9 @@
 
 * **UI / Framework:** Cross-Platform Mobile Architecture (Translucent Floating Bar, Custom Design System)
 * **AI & NLP:** Google Gemini API (Optional Natural Language Styling)
-* **Monetization Engine:** RevenueCat SDK (Freemium Gating & In-App Subscriptions)
+* **Monetization Engine:** RevenueCat SDK (WIP — Freemium Gating & In-App Subscriptions for Shipaton Next Gen)
 * **Storage & Security:** Local SQLite Database, Android Keystore Encryption
-* **APIs:** OpenWeather API / Device Location Services
+* **APIs:** Open-Meteo API / Device Location Services
 
 ---
 
@@ -41,6 +41,19 @@ Where:
 ## 📦 Getting Started
 
 ### Prerequisites
-* Android SDK 24+ / iOS 15+
+* Flutter SDK 3.7+ / Dart 3.7+
+* Android SDK (API 23+) or Xcode for iOS
 * (Optional) Google Gemini API Key for AI styling features
+* (Optional) RevenueCat public SDK key for Pro billing
+
+```bash
+git clone https://github.com/KushagrIttan/FitFlow.git
+cd FitFlow/daily_fit
+cp .env.example .env   # paste REVENUECAT_ANDROID_KEY into .env
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter run
+```
+
+Full steps (keys, release build, tests): see [`daily_fit/README.md`](daily_fit/README.md).
 

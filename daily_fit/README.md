@@ -4,25 +4,47 @@ A local-first, privacy-focused Flutter application for tracking your wardrobe an
 
 ## Getting Started
 
-1. **Open the Project:**
-   Open the `daily_fit` folder in Android Studio. Ensure you have the Flutter and Dart plugins installed.
+### Prerequisites
+* Flutter SDK 3.7+ (`flutter --version`)
+* Android SDK (API 23+) via Android Studio, or Xcode for iOS
+* A device or emulator
 
-2. **Add Your Gemini API Key (in the app):**
-   Open **Settings → AI Stylist** inside the app, paste your Google Gemini API
-   key (from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)),
-   tap **Verify** to confirm it works, then **Save Key**. It is stored encrypted
-   on-device (Android Keystore) and never ships in the app binary.
-   Without a key the app still works — recommendations fall back to local
-   scoring (no AI styling).
+### 1. Clone and install
+```bash
+git clone https://github.com/KushagrIttan/FitFlow.git
+cd FitFlow/daily_fit
+cp .env.example .env   # then paste your RevenueCat public key into .env
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+```
 
-3. **Running the App via USB Debugging:**
-   - Enable Developer Options and USB Debugging on your Pixel 7.
-   - Connect your Pixel 7 to your computer via USB.
-   - In Android Studio, select your Pixel 7 from the device dropdown at the top.
-   - Click the green "Play" (Run) button, or run the following in the terminal:
-     ```bash
-     flutter run
-     ```
+### 2. Configure keys (both optional — the app runs free/local without them)
+* **RevenueCat (Pro billing):** paste your public SDK key as
+  `REVENUECAT_ANDROID_KEY=goog_...` in `.env`
+  (or pass `--dart-define=REVENUECAT_ANDROID_KEY=goog_...`).
+  Without it the app runs in free mode and **Settings → Daily Fit Pro**
+  shows "Billing is not configured".
+* **Gemini (AI styling):** open **Settings → AI Stylist** inside the app,
+  paste your key (from
+  [aistudio.google.com/apikey](https://aistudio.google.com/apikey)),
+  tap **Verify**, then **Save Key**. It is stored encrypted
+  on-device (Android Keystore) and never ships in the app binary.
+  Without a key the app still works — recommendations fall back to local
+  scoring (no AI styling).
+
+### 3. Run
+```bash
+flutter run
+# release APK:
+flutter build apk --release
+# verify:
+flutter analyze
+flutter test
+```
+
+### 4. Running via Android Studio / USB debugging
+* Enable Developer Options and USB Debugging on your device.
+* Connect via USB, select the device in the device dropdown, press Run.
 
 ## Recommendation Logic Overview
 

@@ -1,5 +1,5 @@
 name: daily_fit
-description: "A new Flutter project."
+description: "Daily Fit — local-first wardrobe tracker with weather-aware outfit recommendations."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -53,6 +53,8 @@ dependencies:
   audioplayers: 5.2.1
   geolocator: ^13.0.2
   geocoding: ^3.0.0
+  purchases_flutter: ^8.0.0
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -90,10 +92,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # NOTE: no .env asset. The Gemini API key is entered in-app and stored
+  # NOTE: .env holds ONLY the publishable RevenueCat public key
+  # (REVENUECAT_ANDROID_KEY). The Gemini API key is entered in-app and stored
   # encrypted (flutter_secure_storage) — never bundled with the binary.
 
   assets:
+    - .env
     - assets/icon/
     - assets/audio/
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # hermes-verify-dailyfit.sh — ad-hoc verification (persisted as tool/verify.sh).
 set -u
-PROJ="/c/Users/Kushagr/Documents/Wardrobe App/daily_fit"
+# Portable: repo root = parent of this script's dir (works on any machine).
+PROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJ" || { echo "FAIL: cannot cd"; exit 1; }
 PASS=0; FAIL=0
 ok()  { echo "  ✅ $1"; PASS=$((PASS+1)); }
@@ -22,9 +23,9 @@ echo "$B" | grep -q "app-release.apk" && ok "release APK rebuilt" || bad "releas
 APK="build/app/outputs/flutter-apk/app-release.apk"
 AAPT=$(find "$LOCALAPPDATA/Android/Sdk/build-tools" -name aapt2.exe 2>/dev/null | sort -V | tail -1)
 
-echo "== 4/9 no .env asset in release APK (key no longer ships) =="
-ENV_IN_APK=$(unzip -l "$APK" 2>/dev/null | grep -c "\.env" || true)
-[ "$ENV_IN_APK" -eq 0 ] && ok "no .env in APK" || bad "found .env asset in APK"
+echo "== 4/9 no Gemini secret in release APK (.env holds only the public RC key) =="
+GEM_IN_APK=$(unzip -p "$APK" assets/.env 2>/dev/null | grep -c "AIza" || true)
+[ "$GEM_IN_APK" -eq 0 ] && ok "no Gemini key in APK" || bad "Gemini key found in APK"
 
 echo "== 5/9 INTERNET in release APK =="
 P=$("$AAPT" dump badging "$APK" 2>/dev/null | grep -i "uses-permission")
@@ -50,7 +51,11 @@ print('custom' if (y and d) else 'default')
 [ "$V" = "custom" ] && ok "custom hanger icon" || bad "icon is default"
 
 echo "== 9/9 .env untracked + no real key value in git =="
-[ "$(git ls-files | grep -c '^\.env$')" -eq 0 ] && ok ".env not tracked" || bad ".env tracked"
+[ "$(git ls-files | grep -c '^.env$')" -eq 0 ] && ok ".env not tracked" || bad ".env tracked"
+[ -f .env.example ] && ok ".env.example template present" || bad ".env.example missing"
+# .env files must never contain a Gemini (AIza) value — only the public RC key.
+ENV_GEMINI=$(grep -rh "AIza" .env .env.example 2>/dev/null | grep -c . || true)
+[ "$ENV_GEMINI" -eq 0 ] && ok "no Gemini value in .env files" || bad "Gemini value in .env files"
 # Generic scan: any blob containing a real-looking GEMINI_API_KEY assignment,
 # excluding the documented 'your_*' placeholders. (Embeds no secret.)
 HITS=$(git rev-list --all --objects | while read h p; do

@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,13 +24,22 @@ import 'data/database.dart';
 import 'data/wardrobe_repository.dart';
 import 'data/theme_mode_provider.dart';
 import 'data/api_key_service.dart';
+import 'data/purchases_service.dart';
 
 import 'data/database_provider.dart';
 import 'data/seed_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Load .env (RevenueCat *public* key only). A missing file just means
+  // free/local mode — never fatal, and safe in tests.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('dotenv not loaded (free mode): $e');
+  }
+
   final prefs = await SharedPreferences.getInstance();
   
   // Create provider container to seed DB before running app
@@ -43,6 +53,12 @@ void main() async {
   // Load the Gemini API key stored in secure storage (if any) so
   // recommendations can use it from the very first frame.
   await container.read(geminiApiKeyProvider.notifier).loadFromStorage();
+  // RevenueCat Pro (safe no-op when no key is configured).
+  try {
+    await container.read(purchasesServiceProvider).init();
+  } catch (e) {
+    debugPrint('Purchases init failed: $e');
+  }
   // Local notification reminders (safe no-op if the platform rejects it).
   try {
     await NotificationService.instance.init();

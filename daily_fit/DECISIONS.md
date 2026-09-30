@@ -17,9 +17,9 @@
    - **Reasoning:** Sending the entire wardrobe database as a prompt to Gemini every time would quickly exhaust free API limits and token windows as the wardrobe grows. Pre-scoring locally ensures API usage stays minimal and ensures the rules (no repeating yesterday's shirt, ignore laundry) are strictly enforced mathematically before AI styling takes over.
 
 5. **API Key Management**
-   - **Decision:** Replaced `flutter_dotenv` + `.env` asset with in-app configuration.
-   - **Reasoning:** Bundling `.env` as a Flutter asset shipped the key inside the
-     APK — extractable by anyone. The key is now entered in **Settings → AI
-     Stylist** and stored encrypted via `flutter_secure_storage` (Android
-     Keystore). The binary is key-free and the key never touches git.
-     A "Verify" button confirms the key works before saving.
+   - **Decision:** Gemini key uses in-app configuration; RevenueCat key uses `.env`.
+   - **Reasoning:** The Gemini key is a true secret, so it is entered in **Settings → AI Stylist** and stored encrypted via `flutter_secure_storage` (Android Keystore) — it never touches git or the app bundle. A "Verify" button confirms the key works before saving. The RevenueCat key is publishable by design, so it lives in `.env` (`REVENUECAT_ANDROID_KEY`, see `.env.example`, overridable with `--dart-define`) and is safe to bundle. Every `PurchasesService` call is defensive: unconfigured builds and widget tests run in free/local mode instead of throwing.
+
+6. **Monetization (Shipaton Next Gen)**
+   - **Decision:** `purchases_flutter` with a single `pro` entitlement gating unlimited AI styling, trip plans and full insights; free mode keeps local recommendations fully usable.
+   - **Reasoning:** Satisfies the Shipaton requirement for thoughtful RevenueCat use while keeping the app evaluable from video + code (no store listing needed): Pro status surfaces in **Settings → Daily Fit Pro** with View plans / Restore, and every paywall path degrades to a clear "billing not configured" message instead of a crash.

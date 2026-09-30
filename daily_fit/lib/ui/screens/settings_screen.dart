@@ -10,6 +10,7 @@ import '../../data/backup_service.dart';
 import '../../data/notification_service.dart';
 import '../../data/theme_mode_provider.dart';
 import '../../data/api_key_service.dart';
+import '../../data/purchases_service.dart';
 import '../../data/recommendation_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -161,6 +162,81 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SnackBar(content: Text('API key removed — AI styling is off')),
       );
     }
+  }
+
+  Future<void> _restorePro() async {
+    final ok =
+        await ref.read(purchasesServiceProvider).restore();
+    ref.invalidate(isProProvider);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok
+              ? 'Pro restored — welcome back!'
+              : 'No active Pro purchase found'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showPlans() async {
+    final service = ref.read(purchasesServiceProvider);
+    if (!service.isConfigured) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Pro billing is not configured yet — add your RevenueCat key to .env'),
+          ),
+        );
+      }
+      return;
+    }
+    final offerings = await service.offerings();
+    if (!mounted) return;
+    final packages = offerings?.current?.availablePackages ?? [];
+    if (packages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No plans available right now — check back soon'),
+        ),
+      );
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text('Daily Fit Pro'),
+              subtitle: Text('Unlimited AI styling, plans & insights'),
+            ),
+            for (final package in packages)
+              ListTile(
+                title: Text(package.storeProduct.title),
+                subtitle: Text(package.storeProduct.priceString),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final ok = await service.purchasePackage(package);
+                  ref.invalidate(isProProvider);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(ok
+                            ? 'Pro unlocked — enjoy!'
+                            : 'Purchase cancelled'),
+                      ),
+                    );
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _exportBackup() async {
@@ -379,6 +455,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ],
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('Daily Fit Pro', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.workspace_premium_outlined, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ref.watch(isProProvider).when(
+                              data: (isPro) => Text(
+                                isPro
+                                    ? 'Pro: ACTIVE'
+                                    : 'Pro: Free plan',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              loading: () => const Text('Pro: checking…',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w600)),
+                              error: (_, __) => const Text('Pro: Free plan',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w600)),
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    ref.watch(purchasesServiceProvider).isConfigured
+                        ? 'Pro unlocks unlimited AI styling, trip plans and full insights.'
+                        : 'Billing is not configured in this build — the app runs fully in free/local mode.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _showPlans,
+                          child: const Text('View plans'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _restorePro,
+                          child: const Text('Restore'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
